@@ -8,7 +8,7 @@
 #
 # usage:		Add the following lines to Apache's httpd.conf
 #
-	LoadModule modcfml_module     [your path to]/mod_cfml.so
+	LoadModule modcfml_module	 [your path to]/mod_cfml.so
 	CFMLHandlers ".cfm .cfc .cfml"
 	# optional:
 	LogHeaders [true|false]
@@ -38,9 +38,9 @@ static int modcfml_handler(request_rec *r);
  ==============================================================================
  */
 typedef struct {
-    const char *CFMLHandlers;
-    bool LogHeaders;
-    bool LogHandlers;
+	const char *CFMLHandlers;
+	bool LogHeaders;
+	bool LogHandlers;
 	bool LogAliases;
 } modcfml_config;
 
@@ -70,21 +70,21 @@ static modcfml_config config;
 /* Handler for the "LogHeaders" directive */
 const char *modcfml_set_logheaders(cmd_parms *cmd, void *cfg, const char *arg)
 {
-    if(strcasecmp(arg, "true") == 0){
-    	config.LogHeaders = true;
-    }
-    else config.LogHeaders = false;
-    return NULL;
+	if(strcasecmp(arg, "true") == 0){
+		config.LogHeaders = true;
+	}
+	else config.LogHeaders = false;
+	return NULL;
 }
 
 /* Handler for the "LogHandlers" directive */
 const char *modcfml_set_loghandlers(cmd_parms *cmd, void *cfg, const char *arg)
 {
-    if(strcasecmp(arg, "true") == 0) {
-    	config.LogHandlers = true;
-    }
-    else config.LogHandlers = false;
-    return NULL;
+	if(strcasecmp(arg, "true") == 0) {
+		config.LogHandlers = true;
+	}
+	else config.LogHandlers = false;
+	return NULL;
 }
 
 /* Handler for the "LogAliases" directive */
@@ -101,7 +101,7 @@ const char *modcfml_set_logaliases(cmd_parms *cmd, void *cfg, const char *arg)
 const char *modcfml_set_cfmlhandlers(cmd_parms *cmd, void *cfg, const char *arg)
 {
 	config.CFMLHandlers = arg;
-    return NULL;
+	return NULL;
 }
 
 /*
@@ -111,25 +111,25 @@ const char *modcfml_set_cfmlhandlers(cmd_parms *cmd, void *cfg, const char *arg)
  */
 static const command_rec modcfml_directives[] =
 {
-    AP_INIT_TAKE1("CFMLHandlers", modcfml_set_cfmlhandlers, NULL, RSRC_CONF, "Which file types to work with"),
-    AP_INIT_TAKE1("LogHandlers", modcfml_set_loghandlers, NULL, RSRC_CONF, "Logging of the CFMLHandlers true/false"),
+	AP_INIT_TAKE1("CFMLHandlers", modcfml_set_cfmlhandlers, NULL, RSRC_CONF, "Which file types to work with"),
+	AP_INIT_TAKE1("LogHandlers", modcfml_set_loghandlers, NULL, RSRC_CONF, "Logging of the CFMLHandlers true/false"),
 	AP_INIT_TAKE1("LogAliases", modcfml_set_logaliases, NULL, RSRC_CONF, "Logging of the available Aliases true/false"),
-    AP_INIT_TAKE1("LogHeaders", modcfml_set_logheaders, NULL, RSRC_CONF, "Logging of the incoming headers true/false"),
-    { NULL }
+	AP_INIT_TAKE1("LogHeaders", modcfml_set_logheaders, NULL, RSRC_CONF, "Logging of the incoming headers true/false"),
+	{ NULL }
 };
 
 
-/* Define our module as an entity and assign a function for registering hooks  */
+/* Define our module as an entity and assign a function for registering hooks */
 
-module AP_MODULE_DECLARE_DATA   modcfml_module =
+module AP_MODULE_DECLARE_DATA modcfml_module =
 {
-    STANDARD20_MODULE_STUFF,
-    NULL,            // Per-directory configuration handler
-    NULL,            // Merge handler for per-directory configurations
-    NULL,            // Per-server configuration handler
-    NULL,            // Merge handler for per-server configurations
-    modcfml_directives,            // Any directives we may have for httpd
-    register_hooks   // Our hook registering function
+	STANDARD20_MODULE_STUFF,
+	NULL,					// Per-directory configuration handler
+	NULL,					// Merge handler for per-directory configurations
+	NULL,					// Per-server configuration handler
+	NULL,					// Merge handler for per-server configurations
+	modcfml_directives,		// Any directives we may have for httpd
+	register_hooks			// Our hook registering function
 };
 
 static module *find_module(char *name, request_rec* r)
@@ -147,18 +147,18 @@ static module *find_module(char *name, request_rec* r)
 /* register_hooks: Adds a hook to the httpd process */
 static void register_hooks(apr_pool_t *pool) 
 {
-    config.CFMLHandlers = ".cfm .cfc .cfml";
-    
-    /* Hook the request handler */
-    ap_hook_handler(modcfml_handler, NULL, NULL, APR_HOOK_FIRST);
+	config.CFMLHandlers = ".cfm .cfc .cfml";
+	
+	/* Hook the request handler */
+	ap_hook_handler(modcfml_handler, NULL, NULL, APR_HOOK_FIRST);
 }
 
 static int print_header(void* rec, const char* key, const char* value)
 {
-    request_rec* r = (request_rec *)rec;
+	request_rec* r = (request_rec *)rec;
 	ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server,
 		"Incoming header [%s] => %s", key, value);
-    return 1;
+	return 1;
 }
 
 
@@ -226,7 +226,7 @@ static int add_alias_header(request_rec* r)
 
 static int modcfml_handler(request_rec *r)
 {
-    char *ext;
+	char *ext;
 	// get the file extension
 	ext = strrchr(r->filename, '.');
 
@@ -247,7 +247,7 @@ static int modcfml_handler(request_rec *r)
 	strcpy(handlers, config.CFMLHandlers);
 	
 	char *handler;
-    const char delim[2] = " ";
+	const char delim[2] = " ";
 	bool found = false;
 	handler = strtok(handlers, delim);
 	while (handler != NULL)
@@ -285,6 +285,6 @@ static int modcfml_handler(request_rec *r)
 		apr_table_do(print_header, r, r->headers_in, NULL);
 	}
 
-    // Let Apache know it should continue to do what it wants to
-    return DECLINED;
+	// Let Apache know it should continue to do what it wants to
+	return DECLINED;
 }
