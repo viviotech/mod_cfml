@@ -27,13 +27,13 @@ import java.text.SimpleDateFormat;
 
 // servlet
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
 
 // apache tomcat
 import org.apache.catalina.Host;
 import org.apache.catalina.Engine;
-import org.apache.catalina.core.*;
+import org.apache.catalina.core.StandardHost;
 import org.apache.catalina.Globals;
+import org.apache.catalina.Container;
 import org.apache.catalina.valves.ValveBase;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
@@ -41,16 +41,8 @@ import org.apache.catalina.startup.HostConfig;
 
 public class core extends ValveBase implements Serializable {
 
-    // declare standard vars
-    private String tcDocRoot;
-    private String tcHost;
-    private String[] tcHostPortFilter;
     private String[] contextRecord;
-    private String tcURI;
-    private String tcURIParams;
-    private String tcRedirectURL;
-    private String newHostConfDir;
-    private String newHostWorkDir;
+    // declare standard vars
     
     // declare configurable param defaults
     private boolean loggingEnabled = false;
@@ -86,23 +78,58 @@ public class core extends ValveBase implements Serializable {
 
     @Override
     public void invoke (Request request, Response response) throws IOException, ServletException {
-        // 
-        
+		String tcDocRoot;
+		String tcHost;
+		String tcMainHost;
+		String[] tcHostPortFilter;
+
         // make sure waitforcontext is a positive number
         if ( waitForContext < 0 ) {
             // if it's not valid, set to default
             waitForContext = 3;
         }
         // Get the DocRoot value from the HTTP header
-        this.tcDocRoot = ((HttpServletRequest) request).getHeader("X-Tomcat-DocRoot");
+        tcDocRoot = request.getHeader("X-Tomcat-DocRoot");
+		tcMainHost = request.getHeader("X-Tomcat-ServerName");
         // Get the Host name value from the HTTP header
-        this.tcHost = ((HttpServletRequest) request).getHeader("Host");
-        // Gete the URI so we can pass it to ourselves again if needed
-        this.tcURI = request.getDecodedRequestURI();
-        this.tcURIParams = request.getQueryString();
+        tcHost = request.getHeader("Host");
+		// the X-Tomcat-ServerName header might not be available
+		if (tcMainHost == null || tcMainHost.isEmpty()) {
+			tcMainHost = tcHost;
+		}
+
+        // remove the port number from the host value if it's present
+        if (tcHost != null && tcHost.contains(":")) {
+            // if a colon is present, a port was passed
+            // split the host value into two parts, the host and the port value
+            tcHostPortFilter = tcHost.split(":");
+			
+            // set tcHost to contain ONLY the host value
+			if (tcHost.equals(tcMainHost)) {
+	            tcMainHost = tcHostPortFilter[0];
+			}
+            tcHost = tcHostPortFilter[0];
+			
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] tcHost contains ':'. New value => " + tcHost);
+			}
+        }
+
+        if (tcMainHost != null && tcMainHost.contains(":")) {
+            // if a colon is present, a port was passed
+            // split the host value into two parts, the host and the port value
+            tcHostPortFilter = tcMainHost.split(":");
+			
+            // set tcMainHost to contain ONLY the host value
+            tcMainHost = tcHostPortFilter[0];
+			
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] tcMainHost contains ':'. New value => " + tcMainHost);
+			}
+        }
 
         // verify the host value exists and isn't blank
-        if ((this.tcHost == null) || this.tcHost.length() == 0) {
+        if ((tcMainHost == null) || tcMainHost.isEmpty()) {
             // bad host? Skip this Valve.
             if (loggingEnabled) {
                 System.out.println("[mod_cfml] FATAL: Invalid host: Null or zero-length.");
@@ -111,20 +138,25 @@ public class core extends ValveBase implements Serializable {
             return;
         }
 
+        // Gete the URI so we can pass it to ourselves again if needed
+        String tcURI = request.getDecodedRequestURI();
+        String tcURIParams = request.getQueryString();
+
         // logging for debugging purposes
         if (loggingEnabled) {
-            System.out.println("[mod_cfml] Decoded Request URI => " + this.tcURI);
-            System.out.println("[mod_cfml] QueryString => " + this.tcURIParams);
-            System.out.println("[mod_cfml] DocRoot Value => " + this.tcDocRoot);
-            System.out.println("[mod_cfml] Host Value => " + this.tcHost);
+            System.out.println("[mod_cfml] Decoded Request URI => " + tcURI);
+            System.out.println("[mod_cfml] QueryString => " + tcURIParams);
+            System.out.println("[mod_cfml] DocRoot Value => " + tcDocRoot);
+			if (!tcMainHost.equals(tcHost)) {
+	            System.out.println("[mod_cfml] Webserver main Host => " + tcMainHost);
+	            System.out.println("[mod_cfml] Alias Value => " + tcHost);
+			} else {
+	            System.out.println("[mod_cfml] Host Value => " + tcHost);
+			}
         }
-
-        // get system vars
-        Host currentHost = (Host) getContainer();
-        Engine engine = (Engine) currentHost.getParent();
-
+		
         // verify the tcDocRoot value exists and isn't blank
-        if ((this.tcDocRoot == null) || this.tcDocRoot.length() == 0) {
+        if ((tcDocRoot == null) || tcDocRoot.isEmpty()) {
             // bad DocRoot? Skip this Valve.
             if (loggingEnabled) {
                 System.out.println("[mod_cfml] FATAL: Invalid DocRoot: Null or zero-length.");
@@ -132,30 +164,16 @@ public class core extends ValveBase implements Serializable {
             getNext().invoke(request, response);
             return;
         }
-        
-        if (loggingEnabled) {
-            System.out.println("[mod_cfml] tcHost contains ':' ? => " + this.tcHost.contains(":"));
-        }
 
-        // remove the port number from the host value if it's present
-        if (this.tcHost.contains(":")) {
-            // if a colon is present, a port was passed
-            // split the host value into two parts, the host and the port value
-            tcHostPortFilter = this.tcHost.split(":");
-            if (loggingEnabled) {
-                for (int i = 0; i < tcHostPortFilter.length; i++) {
-                    System.out.println("[mod_cfml] Host split value [" + i + "]: " + tcHostPortFilter[i]);
-                }
-            }
-            // set tcHost to contain ONLY the host value
-            this.tcHost = this.tcHostPortFilter[0];
-        }
+        // get system vars
+        Host currentHost = (Host) getContainer();
+        Engine engine = (Engine) currentHost.getParent();
 
         // see if the host already exists
-        if (engine.findChild(this.tcHost) != null) {
+        if (engine.findChild(tcHost) != null) {
             // host already exist? Skip this Valve.
             if (loggingEnabled) {
-                System.out.println("[mod_cfml] FATAL: Host already exists.");
+                System.out.println("[mod_cfml] FATAL: Host ["+tcHost+"] already exists.");
             }
             getNext().invoke(request, response);
             return;
@@ -260,29 +278,44 @@ public class core extends ValveBase implements Serializable {
 // END Throttling
 
         // set base variables for tcDocRoot file system check
-        File tcDocRootFile = null;
-        File file = null;
-
-        file = new File(this.tcDocRoot);
-        tcDocRootFile = file.getCanonicalFile();
+        File file = new File(tcDocRoot);
+        File tcDocRootFile = file.getCanonicalFile();
 
         if (!tcDocRootFile.isDirectory()) {
             // log the invalid directory if we have logging on
             if (loggingEnabled) {
-                System.out.println("[mod_cfml] FATAL: DocRoot value ["+this.tcDocRoot+"] failed isDirectory() check. Directory may not exist, or Tomcat may not have permission to check it.");
+                System.out.println("[mod_cfml] FATAL: DocRoot value ["+tcDocRoot+"] failed isDirectory() check. Directory may not exist, or Tomcat may not have permission to check it.");
             }
 			getNext().invoke(request, response);
 			return;
         }
 
-// everything checks out, create the new host
-// STEP 1 - Check/Create the XML config and work directories
+// everything checks out, create the new host / add the alias
 
+		StandardHost host;
+
+// STEP 1: check if the mainHost exists, and we need to add the current Host as alias
+		boolean addedAsAlias = false;
+		if (!tcMainHost.equals(tcHost)) {
+	        if (engine.findChild(tcMainHost) != null) {
+				Container child = engine.findChild(tcMainHost);
+				if(!(child instanceof StandardHost)) {
+					System.out.println("[mod_cfml] FATAL: The Tomcat Host [" + tcMainHost + "], parent for host-alias [" + tcHost + "], is not an instance of StandardHost! (type: " + child.getClass().getName() + ")");
+				}
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml] Adding host alias [" + tcHost + "] to existing Host [" + tcMainHost + "]");
+				}
+				host = (StandardHost)child;
+				host.addAlias(tcHost);
+				addedAsAlias = true;
+			}
+		}
+		
+// STEP 2 - Check/Create the XML config and work directories
 		// set the config directory value
-		this.newHostConfDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/conf/Catalina/" + this.tcHost;
-
+		String newHostConfDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/conf/Catalina/" + tcMainHost;
 		File newHostConfDirFile = null;
-		file = new File(this.newHostConfDir);
+		file = new File(newHostConfDir);
 		newHostConfDirFile = file.getCanonicalFile();
 
 		// see if the directory exists already
@@ -292,7 +325,7 @@ public class core extends ValveBase implements Serializable {
 				System.out.println("[mod_cfml] Creating new config directory: " + newHostConfDirFile);
 			}
 			file.mkdir();
-		} else {
+		} else if (addedAsAlias == false) {
 			// if it does exist, remove it (and everything under it)
 			// because it's from an old config
 			if (loggingEnabled) {
@@ -307,10 +340,10 @@ public class core extends ValveBase implements Serializable {
 		}
 
 		// set the work directory value
-		this.newHostWorkDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/work/Catalina/" + this.tcHost;
+		String newHostWorkDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/work/Catalina/" + tcMainHost;
 
 		File newHostWorkDirFile = null;
-		file = new File(this.newHostWorkDir);
+		file = new File(newHostWorkDir);
 		newHostWorkDirFile = file.getCanonicalFile();
 
 		// see if the directory exists already
@@ -319,7 +352,7 @@ public class core extends ValveBase implements Serializable {
 			if (loggingEnabled) {
 				System.out.println("[mod_cfml] Work directory doesn't exist: " + newHostWorkDirFile);
 			}
-		} else {
+		} else if (addedAsAlias == false) {
 			// if it does exist, remove it (and everything under it)
 			// because it's from an old config
 			if (loggingEnabled) {
@@ -328,44 +361,51 @@ public class core extends ValveBase implements Serializable {
 			deleteDir(file);
 		}
 
-// STEP 2 - Write the context XML config
+// STEP 3 - Write the context XML config
 		String newHostConfFile = newHostConfDirFile + "/ROOT.xml";
-		if (loggingEnabled) {
-			System.out.println("[mod_cfml] Creating context file: " + newHostConfFile);
+		file = new File(newHostConfFile);
+		if (!file.exists()) {
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Creating context file: " + newHostConfFile);
+			}
+			PrintWriter out = new PrintWriter(new FileOutputStream(file));
+			out.println("<?xml version='1.0' encoding='utf-8'?>");
+			out.println("<Context docBase=\"" + tcDocRoot + "\">");
+			out.println("  <WatchedResource>WEB-INF/web.xml</WatchedResource>");
+			out.println("</Context>");
+			out.flush(); // write to the file
+			out.close(); // close out the file
 		}
-		PrintWriter out = new PrintWriter(new FileOutputStream(newHostConfFile));
-		out.println("<?xml version='1.0' encoding='utf-8'?>");
-		out.println("<Context docBase=\"" + this.tcDocRoot + "\">");
-		out.println("  <WatchedResource>WEB-INF/web.xml</WatchedResource>");
-		out.println("</Context>");
-		out.flush(); // write to the file
-		out.close(); // close out the file
 
-// STEP 3 - Create the context
-		StandardHost host = new StandardHost();
-		// log it
-		if (loggingEnabled) {
-			System.out.println("[mod_cfml] Creating New Host... ");
-			// System.out.println("setAppBase Value => " + tcDocRootFile.toString());
-			System.out.println("[mod_cfml] setName Value => " + this.tcHost);
-		}
-		host.addLifecycleListener(new HostConfig());
-		host.setAppBase("webapps");
-		// host.setAppBase(tcDocRootFile.toString());
-		host.setName(this.tcHost);
-		host.setAutoDeploy(true);
-		host.setDeployOnStartup(true);
-		host.setDeployXML(true);
-		// make it
-		try {
-			engine.addChild(host);
-		} catch (Exception e) {
-			System.out.println("[mod_cfml] ERROR: " + e.toString());
-			return;
+// STEP 4 - Create the context
+		if (addedAsAlias == false) {
+			host = new StandardHost();
+			// log it
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Creating New Host... ");
+				// System.out.println("setAppBase Value => " + tcDocRootFile.toString());
+				System.out.println("[mod_cfml] setName Value => " + tcMainHost);
+			}
+			host.addLifecycleListener(new HostConfig());
+			host.setAppBase("webapps");
+			// host.setAppBase(tcDocRootFile.toString());
+			host.setName(tcMainHost);
+			host.setAutoDeploy(true);
+			host.setDeployOnStartup(true);
+			host.setDeployXML(true);
+			if (!tcHost.equals(tcMainHost)) {
+				host.addAlias(tcHost);
+			}
+			// make it
+			try {
+				engine.addChild(host);
+			} catch (Exception e) {
+				System.out.println("[mod_cfml] ERROR: " + e.toString());
+				return;
+			}
 		}
 		
-		
-// STEP 4 - ensure the context config files and work directory exist
+// STEP 5 - ensure the context config files and work directory exist
 		if (loggingEnabled) {
 			System.out.println("[mod_cfml] Wait for context? => " + (waitForContext > 0 ? "true (max. " + waitForContext + " seconds)" : "false") );
 		}
@@ -406,17 +446,19 @@ public class core extends ValveBase implements Serializable {
 		}
 
 
-// STEP 5 - record the times and serialize our data
+// STEP 6 - record the times and serialize our data
 		
 		// contextRecord array key:
 		// 0 = lastContext - stores time last context was made (millisecond value)
 		// 1 = throttleDate - stores day this record is for (days in year value)
 		// 2 = throttleValue - stores number of contexts created so far during this day
 		
-		// add 1 to our throttleValue
-		int numContexts = Integer.parseInt(contextRecord[2]);
-		numContexts++;
-		contextRecord[2] = Integer.toString(numContexts);
+		// add 1 to our throttleValue, if we added a new Host
+		if (addedAsAlias == false) {
+			int numContexts = Integer.parseInt(contextRecord[2]);
+			numContexts++;
+			contextRecord[2] = Integer.toString(numContexts);
+		}
 		
 		// serialize and save values
 		try {
@@ -429,25 +471,26 @@ public class core extends ValveBase implements Serializable {
 			}
 		}
 		
-// STEP 6 - call ourselves again so we bypass localhost
-		if (!(this.tcURIParams == null) && this.tcURIParams.length() > 0) {
+// STEP 7 - call ourselves again so we bypass localhost
+		String tcRedirectURL;
+		if (!(tcURIParams == null) && tcURIParams.length() > 0) {
 			// if there are URI params, pass them
-			this.tcRedirectURL = this.tcURI + "?" + this.tcURIParams;
-		} else if (this.tcURI.equals("index.cfm") || this.tcURI.equals("/index.cfm")) {
+			tcRedirectURL = tcURI + "?" + tcURIParams;
+		} else if (tcURI.equals("index.cfm") || tcURI.equals("/index.cfm")) {
 			// if we're hitting an index file with no uri params, we're probably
 			// getting a request for a TLD, so just redirect to a TLD
-			this.tcRedirectURL = "";
+			tcRedirectURL = "";
 		} else {
-			this.tcRedirectURL = this.tcURI;
+			tcRedirectURL = tcURI;
 		}
 
 		if (loggingEnabled) {
-			System.out.println("[mod_cfml] Redirect URL => '" + this.tcRedirectURL + "'");
+			System.out.println("[mod_cfml] Redirect URL => '" + tcRedirectURL + "'");
 		}
 
-		response.sendRedirect(this.tcRedirectURL);
-		return;
+		response.sendRedirect(tcRedirectURL);
     }
+	
 
     // create a seperate method for removing directories so we can call it
     // as many times as we may need it (including looping over itself).
