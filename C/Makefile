@@ -20,10 +20,15 @@ module: .libs/mod_cfml.o
 #   install the shared object file into Apache 
 install: local-shared-build
 	$(APXS) -i $(CFLAGS) mod_cfml.la
-	clean
 
 #   cleanup
-.PHONY: clean
-clean:
-	-rm -f mod_cfml.o mod_cfml.lo mod_cfml.slo mod_cfml.la
-	-rm -f .libs/mod_cfml.o .libs/mod_cfml.a .libs/mod_cfml.lai .libs/mod_cfml.la
+.PHONY : clean
+clean :
+	rm -f mod_cfml.o \
+	      mod_cfml.lo \
+	      mod_cfml.slo \
+	      mod_cfml.la \
+          ./.libs/mod_cfml.o \
+          ./.libs/mod_cfml.a \
+          ./.libs/mod_cfml.la \
+          ./.libs/mod_cfml.lai
