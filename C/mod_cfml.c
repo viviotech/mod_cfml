@@ -161,6 +161,22 @@ static int print_header(void* rec, const char* key, const char* value)
 	return 1;
 }
 
+static char* copy_without_trailing_slash(const char* source)
+{
+	int pathlen = strlen(source);
+	if (pathlen > 1 && (strcmp(&source[ pathlen - 1 ], "/") == 0 || strcmp(&source[ pathlen - 1 ], "\\") == 0))
+	{
+		pathlen = pathlen - 1;
+	}
+	char* dest = (char*)malloc( pathlen + 1 );
+	if (dest != NULL)
+	{
+		memcpy(dest, source, pathlen);
+		dest[ pathlen ] = '\0';
+	}
+	return dest;
+}
+
 
 static int add_alias_header(request_rec* r)
 {
@@ -188,6 +204,8 @@ static int add_alias_header(request_rec* r)
 	
 	char * header_string = "";
 	char * temp_str;
+	char * fake = 0;
+	char * real = 0;
 	int i;
 	for (i = 0; i < aliases->nelts; ++i) {
 		alias_entry *alias = &entries[i];
@@ -204,13 +222,18 @@ static int add_alias_header(request_rec* r)
 					"%d. Alias: [%s] -> [%s]", i, alias->fake, alias->real);
 			}
 			
+			/* remove trailing slash, if any */
+			fake = copy_without_trailing_slash(alias->fake);
+			real = copy_without_trailing_slash(alias->real);
 			temp_str = header_string;
-			if((header_string = malloc(strlen(temp_str)+strlen(alias->fake)+strlen(alias->real)+3)) != NULL){
+			
+			if(fake != NULL && real != NULL && (header_string = malloc(strlen(temp_str)+strlen(fake)+strlen(real)+3)) != NULL)
+			{
 				header_string[0] = '\0';// ensures the memory is an empty string
 				strcat(header_string, temp_str);
-				strcat(header_string, alias->fake);
+				strcat(header_string, fake);
 				strcat(header_string, ",");
-				strcat(header_string, alias->real);
+				strcat(header_string, real);
 				strcat(header_string, ";");
 			} else {
 				// fprintf(STDERR,"malloc failed!\n");
@@ -219,7 +242,7 @@ static int add_alias_header(request_rec* r)
 		}
 	}
 
-	apr_table_set(r->headers_in, "X-VDirs", header_string);
+	apr_table_set(r->headers_in, "x-vdirs", header_string);
 	return 1;
 }
 
