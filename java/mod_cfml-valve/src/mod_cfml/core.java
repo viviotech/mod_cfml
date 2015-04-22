@@ -11,7 +11,7 @@ package mod_cfml;
  * http://www.modcfml.org/
  * 
  * Version:
- * 1.0.22
+ * 1.0.27
  */
 
 // java
@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
 import java.io.ObjectOutputStream;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
+import java.lang.String;
 import java.util.Date;
 import java.text.SimpleDateFormat;
 
@@ -50,6 +51,7 @@ public class core extends ValveBase implements Serializable {
     private int waitForContext = 3;
     private int timeBetweenContexts = 30000; // 30 seconds
     private int maxContexts = 10;
+    private boolean scanClassPaths = false;
 
     // methods for configurable params
     public boolean getLoggingEnabled() {
@@ -76,6 +78,12 @@ public class core extends ValveBase implements Serializable {
     public void setMaxContexts(int maxContexts) {
         this.maxContexts = maxContexts;
     }
+    public boolean getScanClassPaths() {
+        return (scanClassPaths);
+    }
+    public void setScanClassPaths(boolean scanClassPaths) {
+        this.scanClassPaths = scanClassPaths;
+    }
 
     @Override
     public void invoke (Request request, Response response) throws IOException, ServletException {
@@ -91,13 +99,28 @@ public class core extends ValveBase implements Serializable {
         }
         // Get the DocRoot value from the HTTP header
         tcDocRoot = request.getHeader("X-Tomcat-DocRoot");
-		tcMainHost = request.getHeader("X-Webserver-Context");
+
+        // verify the tcDocRoot value exists and isn't blank
+        if ((tcDocRoot == null) || tcDocRoot.isEmpty()) {
+            // bad DocRoot? Skip this Valve.
+            if (loggingEnabled) {
+                System.out.println("[mod_cfml] FATAL: X-Tomcat-DocRoot not given or empty.");
+            }
+            getNext().invoke(request, response);
+            return;
+        }
+
         // Get the Host name value from the HTTP header
         tcHost = request.getHeader("Host");
+		// Optional: get the webserver-hostContext-ID
+		tcMainHost = request.getHeader("X-Webserver-Context");
 		// the X-Webserver-Context header might not be available
 		if (tcMainHost == null || tcMainHost.isEmpty()) {
 			tcMainHost = tcHost;
 		}
+		// host names should be lowercase, but Tomcat will not complain, just convert it to lowercase after we use it as a hostname/alias name
+		tcMainHost = tcMainHost.toLowerCase();
+		tcHost = tcHost.toLowerCase();
 
         // remove the port number from the host value if it's present
         if (tcHost != null && tcHost.contains(":")) {
@@ -156,16 +179,6 @@ public class core extends ValveBase implements Serializable {
 			}
         }
 		
-        // verify the tcDocRoot value exists and isn't blank
-        if ((tcDocRoot == null) || tcDocRoot.isEmpty()) {
-            // bad DocRoot? Skip this Valve.
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] FATAL: Invalid DocRoot: Null or zero-length.");
-            }
-            getNext().invoke(request, response);
-            return;
-        }
-
         // get system vars
         Host currentHost = (Host) getContainer();
         Engine engine = (Engine) currentHost.getParent();
@@ -248,19 +261,17 @@ public class core extends ValveBase implements Serializable {
             // if it's not null, ensure we've waited our timeBetweenContexts
             if ((Long.parseLong(contextRecord[0]) + timeBetweenContexts) >  newNow.getTime()) {
                 // if enough time hasn't passed yet, send a "wait" response
-                System.out.println("[mod_cfml] Time Between Contexts has not been fulfilled. Please wait a few moments and try again.");
-                response.sendError(503, "[mod_cfml] Time Between Contexts has not been fulfilled. Please wait a few moments and try again.");
-                return;
+				handleError(503, "Time Between Contexts has not been fulfilled. Please wait a few moments and try again.", response);
+				return;
             }
         }
         
         // verify maxContexts
         if (Integer.parseInt(contextRecord[2]) >= maxContexts) {
             // if maxContexts reached, refuse the request for today
-            System.out.println("[mod_cfml] MaxContexts limit reached. Try again tomorrow.");
-            response.sendError(503, "[mod_cfml] MaxContexts limit reached. Try again tomorrow.");
-            return;
-        }
+			handleError(503, "MaxContexts limit reached. Try again tomorrow.", response);
+			return;
+		}
 
 // save the current time to file, so a next request can do a check for the timeBetweenContexts 
 		// set the lastContext value to now
@@ -302,6 +313,8 @@ public class core extends ValveBase implements Serializable {
 				Container child = engine.findChild(tcMainHost);
 				if(!(child instanceof StandardHost)) {
 					System.out.println("[mod_cfml] FATAL: The Tomcat Host [" + tcMainHost + "], parent for host-alias [" + tcHost + "], is not an instance of StandardHost! (type: " + child.getClass().getName() + ")");
+					getNext().invoke(request, response);
+					return;
 				}
 				if (loggingEnabled) {
 					System.out.println("[mod_cfml] Adding host alias [" + tcHost + "] to existing Host [" + tcMainHost + "]");
@@ -373,6 +386,10 @@ public class core extends ValveBase implements Serializable {
 			out.println("<?xml version='1.0' encoding='utf-8'?>");
 			out.println("<Context docBase=\"" + tcDocRoot + "\">");
 			out.println("  <WatchedResource>WEB-INF/web.xml</WatchedResource>");
+			// the following line is THE difference between slow and fast Context loading. (eg. 3,000 ms vs 150 ms.)
+			if (!scanClassPaths) {
+				out.println("  <JarScanner scanClassPath=\"false\" />");
+			}
 			out.println("</Context>");
 			out.flush(); // write to the file
 			out.close(); // close out the file
@@ -507,6 +524,13 @@ public class core extends ValveBase implements Serializable {
         }
 
         // The directory is now empty so delete it
-        return dir.delete();
-    }
+		return dir.delete();
+	}
+
+	public static void handleError(int statuscode, String msg, Response response) throws ServletException, IOException {
+		System.out.println("[mod_cfml] ERROR " + statuscode + ": " + msg);
+		response.setContentType("text/html");
+		response.getWriter().write("<h3>Tomcat Mod_CFML error</h3><p>" + msg + "</p>");
+		response.setStatus(statuscode);
+	}
 }
