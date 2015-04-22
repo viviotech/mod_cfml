@@ -296,7 +296,7 @@ static int modcfml_handler(request_rec *r)
 
 	// all good: add Tomcat headers
 	apr_table_set(r->headers_in, "X-Tomcat-DocRoot", ap_document_root(r));
-	apr_table_set(r->headers_in, "X-Tomcat-ServerName", r->server->server_hostname);
+	apr_table_set(r->headers_in, "X-Webserver-Context", r->server->server_hostname);
 
 	// new: add a header X-VDirs, which contains all known aliases for the VHost
 	add_alias_header(r);
