@@ -2,6 +2,7 @@ package mod_cfml;
 
 /**
  * @author Jordan Michaels (jordan@viviotech.net)
+ * @modified Paul Klinkenberg (paul@lucee.nl)
  *
  * Licensed Under the LGPL 3.0
  * http://www.opensource.org/licenses/lgpl-3.0.html
@@ -10,7 +11,7 @@ package mod_cfml;
  * http://www.modcfml.org/
  * 
  * Version:
- * 1.0.15
+ * 1.0.22
  */
 
 // java
@@ -90,10 +91,10 @@ public class core extends ValveBase implements Serializable {
         }
         // Get the DocRoot value from the HTTP header
         tcDocRoot = request.getHeader("X-Tomcat-DocRoot");
-		tcMainHost = request.getHeader("X-Tomcat-ServerName");
+		tcMainHost = request.getHeader("X-Webserver-Context");
         // Get the Host name value from the HTTP header
         tcHost = request.getHeader("Host");
-		// the X-Tomcat-ServerName header might not be available
+		// the X-Webserver-Context header might not be available
 		if (tcMainHost == null || tcMainHost.isEmpty()) {
 			tcMainHost = tcHost;
 		}
