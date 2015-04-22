@@ -11,7 +11,7 @@ package mod_cfml;
  * http://www.modcfml.org/
  * 
  * Version:
- * 1.0.28
+ * 1.0.29
  */
 
 // java
@@ -211,27 +211,46 @@ public class core extends ValveBase implements Serializable {
             getNext().invoke(request, response);
             return;
         }
-        
+
+		// set base variables for tcDocRoot file system check
+        File file = new File(tcDocRoot);
+        File tcDocRootFile = file.getCanonicalFile();
+
+        if (!tcDocRootFile.isDirectory()) {
+            // log the invalid directory if we have logging on
+            if (loggingEnabled) {
+                System.out.println("[mod_cfml] FATAL: DocRoot value ["+tcDocRoot+"] failed isDirectory() check. Directory may not exist, or Tomcat may not have permission to check it.");
+            }
+			getNext().invoke(request, response);
+			return;
+        }
+
+
+// Check if we need to add a Host, or just an Alias
+// Aliases do not need to be throttled
+		boolean addAsAlias = (!tcMainHost.equals(tcHost)) && (engine.findChild(tcMainHost) != null);
+
 // BEGIN Throttling
         Date newNow = new Date();
         
         // try pulling up the contextRecord (if it exists yet)
         try {
 			File fi = new File("mod_cfml.dat");
-			FileInputStream fis = new FileInputStream(fi);
-            ObjectInputStream is = new ObjectInputStream(fis);
-			//System.out.println("[mod_cfml] dat file location = " + fi.getAbsolutePath());
-			
-            // load the array into active memory
-            contextRecord = (String[]) is.readObject();
-			fis.close();
-			is.close();
-            // log it
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] lastContext = " + contextRecord[0]);
-                System.out.println("[mod_cfml] throttleDate = " + contextRecord[1]);
-                System.out.println("[mod_cfml] throttleValue = " + contextRecord[2]);
-            }
+			if (fi.exists()) {
+				FileInputStream fis = new FileInputStream(fi);
+				ObjectInputStream is = new ObjectInputStream(fis);
+
+				// load the array into active memory
+				contextRecord = (String[]) is.readObject();
+				fis.close();
+				is.close();
+				// log it
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml] lastContext = " + contextRecord[0]);
+					System.out.println("[mod_cfml] throttleDate = " + contextRecord[1]);
+					System.out.println("[mod_cfml] throttleValue = " + contextRecord[2]);
+				}
+			}
         } catch (Exception ex) {
             if (loggingEnabled) {
                 System.out.println("[mod_cfml] Serialization Read Exception: " + ex.toString());
@@ -274,27 +293,29 @@ public class core extends ValveBase implements Serializable {
             contextRecord[1] = dayInYear.format(newNow);
             contextRecord[2] = "0";
         }
-        
-        // verify timeBetweenContexts
-        if ( contextRecord[0] != null ) {
-            // if it's not null, ensure we've waited our timeBetweenContexts
-            if ((Long.parseLong(contextRecord[0]) + timeBetweenContexts) >  newNow.getTime()) {
-                // if enough time hasn't passed yet, send a "wait" response
+
+		// verify timeBetweenContexts
+		if (!addAsAlias && contextRecord[0] != null) {
+			// if it's not null, ensure we've waited our timeBetweenContexts
+			if ((Long.parseLong(contextRecord[0]) + timeBetweenContexts) > newNow.getTime()) {
+				// if enough time hasn't passed yet, send a "wait" response
 				handleError(503, "Time Between Contexts has not been fulfilled. Please wait a few moments and try again.", response);
 				return;
-            }
-        }
-        
-        // verify maxContexts
-        if (Integer.parseInt(contextRecord[2]) >= maxContexts) {
-            // if maxContexts reached, refuse the request for today
+			}
+		}
+
+		// verify maxContexts
+		if (!addAsAlias && Integer.parseInt(contextRecord[2]) >= maxContexts) {
+			// if maxContexts reached, refuse the request for today
 			handleError(503, "MaxContexts limit reached. Try again tomorrow.", response);
 			return;
 		}
 
 // save the current time to file, so a next request can do a check for the timeBetweenContexts 
 		// set the lastContext value to now
-		contextRecord[0] = String.valueOf(newNow.getTime());
+		if (!addAsAlias || contextRecord[0] == null) {
+			contextRecord[0] = String.valueOf(newNow.getTime());
+		}
 		// serialize and save values
 		try {
 			ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream("mod_cfml.dat"));
@@ -308,25 +329,11 @@ public class core extends ValveBase implements Serializable {
 
 // END Throttling
 
-        // set base variables for tcDocRoot file system check
-        File file = new File(tcDocRoot);
-        File tcDocRootFile = file.getCanonicalFile();
-
-        if (!tcDocRootFile.isDirectory()) {
-            // log the invalid directory if we have logging on
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] FATAL: DocRoot value ["+tcDocRoot+"] failed isDirectory() check. Directory may not exist, or Tomcat may not have permission to check it.");
-            }
-			getNext().invoke(request, response);
-			return;
-        }
-
 // everything checks out, create the new host / add the alias
 
 		StandardHost host;
 
 // STEP 1: check if the mainHost exists, and we need to add the current Host as alias
-		boolean addedAsAlias = false;
 		if (!tcMainHost.equals(tcHost)) {
 	        if (engine.findChild(tcMainHost) != null) {
 				Container child = engine.findChild(tcMainHost);
@@ -340,7 +347,7 @@ public class core extends ValveBase implements Serializable {
 				}
 				host = (StandardHost)child;
 				host.addAlias(tcHost);
-				addedAsAlias = true;
+				addAsAlias = true;
 			}
 		}
 		
@@ -358,7 +365,7 @@ public class core extends ValveBase implements Serializable {
 				System.out.println("[mod_cfml] Creating new config directory: " + newHostConfDirFile);
 			}
 			file.mkdir();
-		} else if (addedAsAlias == false) {
+		} else if (addAsAlias == false) {
 			// if it does exist, remove it (and everything under it)
 			// because it's from an old config
 			if (loggingEnabled) {
@@ -385,7 +392,7 @@ public class core extends ValveBase implements Serializable {
 			if (loggingEnabled) {
 				System.out.println("[mod_cfml] Work directory doesn't exist: " + newHostWorkDirFile);
 			}
-		} else if (addedAsAlias == false) {
+		} else if (addAsAlias == false) {
 			// if it does exist, remove it (and everything under it)
 			// because it's from an old config
 			if (loggingEnabled) {
@@ -415,7 +422,7 @@ public class core extends ValveBase implements Serializable {
 		}
 
 // STEP 4 - Create the context
-		if (addedAsAlias == false) {
+		if (addAsAlias == false) {
 			host = new StandardHost();
 			// log it
 			if (loggingEnabled) {
@@ -491,7 +498,7 @@ public class core extends ValveBase implements Serializable {
 		// 2 = throttleValue - stores number of contexts created so far during this day
 		
 		// add 1 to our throttleValue, if we added a new Host
-		if (addedAsAlias == false) {
+		if (addAsAlias == false) {
 			int numContexts = Integer.parseInt(contextRecord[2]);
 			numContexts++;
 			contextRecord[2] = Integer.toString(numContexts);
