@@ -11,7 +11,7 @@ package mod_cfml;
  * http://www.modcfml.org/
  * 
  * Version:
- * 1.0.27
+ * 1.0.28
  */
 
 // java
@@ -40,6 +40,7 @@ import org.apache.catalina.valves.ValveBase;
 import org.apache.catalina.connector.Request;
 import org.apache.catalina.connector.Response;
 import org.apache.catalina.startup.HostConfig;
+import org.apache.catalina.LifecycleException;
 
 public class core extends ValveBase implements Serializable {
 
@@ -85,12 +86,30 @@ public class core extends ValveBase implements Serializable {
         this.scanClassPaths = scanClassPaths;
     }
 
+	public boolean initInternalCalled = false;
+
+    protected void initInternal() throws LifecycleException {
+        super.initInternal();
+		initInternalCalled = true;
+
+		/* reset the counters; we've rebooted */
+		File fi = new File("mod_cfml.dat");
+		fi.delete();
+    }
+
     @Override
     public void invoke (Request request, Response response) throws IOException, ServletException {
 		String tcDocRoot;
 		String tcHost;
 		String tcMainHost;
 		String[] tcHostPortFilter;
+
+		if (initInternalCalled) {
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] initInternal was called: system rebooted? Counters have been reset.");
+			}
+			initInternalCalled=false;
+		}
 
         // make sure waitforcontext is a positive number
         if ( waitForContext < 0 ) {
