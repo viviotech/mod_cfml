@@ -113,7 +113,7 @@ public class core extends ValveBase implements Serializable {
 
         // logging for debugging purposes
         if (loggingEnabled) {
-            System.out.println("[mod_cfml] Decoded Requst URI => " + this.tcURI);
+            System.out.println("[mod_cfml] Decoded Request URI => " + this.tcURI);
             System.out.println("[mod_cfml] QueryString => " + this.tcURIParams);
             System.out.println("[mod_cfml] DocRoot Value => " + this.tcDocRoot);
             System.out.println("[mod_cfml] Host Value => " + this.tcHost);
@@ -161,14 +161,20 @@ public class core extends ValveBase implements Serializable {
             return;
         }
         
-        // BEGIN Throttling
+// BEGIN Throttling
         Date newNow = new Date();
         
         // try pulling up the contextRecord (if it exists yet)
         try {
-            ObjectInputStream is = new ObjectInputStream(new FileInputStream("mod_cfml.dat"));
+			File fi = new File("mod_cfml.dat");
+			FileInputStream fis = new FileInputStream(fi);
+            ObjectInputStream is = new ObjectInputStream(fis);
+			//System.out.println("[mod_cfml] dat file location = " + fi.getAbsolutePath());
+			
             // load the array into active memory
-            contextRecord =  (String[]) is.readObject();
+            contextRecord = (String[]) is.readObject();
+			fis.close();
+			is.close();
             // log it
             if (loggingEnabled) {
                 System.out.println("[mod_cfml] lastContext = " + contextRecord[0]);
@@ -236,8 +242,22 @@ public class core extends ValveBase implements Serializable {
             response.sendError(503, "[mod_cfml] MaxContexts limit reached. Try again tomorrow.");
             return;
         }
-        
-        // END Throttling
+
+// save the current time to file, so a next request can do a check for the timeBetweenContexts 
+		// set the lastContext value to now
+		contextRecord[0] = String.valueOf(newNow.getTime());
+		// serialize and save values
+		try {
+			ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream("mod_cfml.dat"));
+			os.writeObject(contextRecord);
+			os.close();
+		} catch (Exception ex) {
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] NOTICE: Serialization Write Exception: " + ex.toString());
+			}
+		}
+
+// END Throttling
 
         // set base variables for tcDocRoot file system check
         File tcDocRootFile = null;
@@ -246,190 +266,187 @@ public class core extends ValveBase implements Serializable {
         file = new File(this.tcDocRoot);
         tcDocRootFile = file.getCanonicalFile();
 
-        if (tcDocRootFile.isDirectory()) {
-            // everything checks out, create the new host
-            // STEP 1 - Check/Create the XML config and work directories
-
-            // set the config directory value
-            this.newHostConfDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/conf/Catalina/" + this.tcHost;
-
-            File newHostConfDirFile = null;
-            file = new File(this.newHostConfDir);
-            newHostConfDirFile = file.getCanonicalFile();
-
-            // see if the directory exists already
-            if (!newHostConfDirFile.isDirectory()) {
-                // if it doesn't exist, create it
-                if (loggingEnabled) {
-                    System.out.println("[mod_cfml] Creating new config directory: " + newHostConfDirFile);
-                }
-                file.mkdir();
-            } else {
-                // if it does exist, remove it (and everything under it)
-                // because it's from an old config
-                if (loggingEnabled) {
-                    System.out.println("[mod_cfml] Removing old config directory: " + newHostConfDirFile);
-                }
-                deleteDir(file);
-                // now make the directory again so we start with a clean slate
-                if (loggingEnabled) {
-                    System.out.println("[mod_cfml] Creating new config directory: " + newHostConfDirFile);
-                }
-                file.mkdir();
-            }
-
-            // set the work directory value
-            this.newHostWorkDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/work/Catalina/" + this.tcHost;
-
-            File newHostWorkDirFile = null;
-            file = new File(this.newHostWorkDir);
-            newHostWorkDirFile = file.getCanonicalFile();
-
-            // see if the directory exists already
-            if (!newHostConfDirFile.isDirectory()) {
-                // if it doesn't exist, ignore it
-                if (loggingEnabled) {
-                    System.out.println("[mod_cfml] Work directory doesn't exist: " + newHostWorkDirFile);
-                }
-            } else {
-                // if it does exist, remove it (and everything under it)
-                // because it's from an old config
-                if (loggingEnabled) {
-                    System.out.println("[mod_cfml] Removing old work directory: " + newHostWorkDirFile);
-                }
-                deleteDir(file);
-            }
-
-            // STEP 2 - Write the context XML config
-            String newHostConfFile = newHostConfDirFile + "/ROOT.xml";
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] Creating context file: " + newHostConfFile);
-            }
-            PrintWriter out = new PrintWriter(new FileOutputStream(newHostConfFile));
-            out.println("<?xml version='1.0' encoding='utf-8'?>");
-            out.println("<Context docBase=\"" + this.tcDocRoot + "\">");
-            out.println("  <WatchedResource>WEB-INF/web.xml</WatchedResource>");
-            out.println("</Context>");
-            out.flush(); // write to the file
-            out.close(); // close out the file
-
-            // STEP 3 -  ensure the context config files and work directory exist
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] Wait for context? => " + (waitForContext > 0) );
-            }
-            if ( waitForContext > 0 ) {
-                if (loggingEnabled) {
-                    System.out.println("[mod_cfml] Verifying context files...");
-                }
-                File tcContextXMLFile = null;
-                File tcContextXMLFilePointer = null;
-
-                tcContextXMLFilePointer = new File(newHostConfFile);
-                tcContextXMLFile = tcContextXMLFilePointer.getCanonicalFile();
-                // wait for the specified number of seconds
-                for (int i = 0; i < waitForContext; i++) {
-                    // check to see if the directory exists
-                    if (newHostConfDirFile.isDirectory()) {
-                        // if it exists, check the file too
-                        if ( tcContextXMLFile.isFile() ) {
-                            // if the dir and file exist, check for the work directory
-                            if ( newHostWorkDirFile.isDirectory() ) {
-                                // if the work directory exists, end this loop
-                                break;
-                            }
-                        }
-                    }
-                    if (loggingEnabled) {
-                        System.out.println("[mod_cfml] Waiting for context files: ["+i+"]");
-                    }
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException e) {
-                    }
-                }
-
-                if (loggingEnabled) {
-                    System.out.println("[mod_cfml] Wait loop ended. Context files found? ["+ tcContextXMLFile.isFile() + "]");
-                }
-            }
-
-            // STEP 4 - Create the context
-            StandardHost host = new StandardHost();
-            // log it
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] Creating New Host... ");
-                // System.out.println("setAppBase Value => " + tcDocRootFile.toString());
-                System.out.println("[mod_cfml] setName Value => " + this.tcHost);
-            }
-            host.addLifecycleListener(new HostConfig());
-            host.setAppBase("webapps");
-            // host.setAppBase(tcDocRootFile.toString());
-            host.setName(this.tcHost);
-            host.setAutoDeploy(true);
-            host.setDeployOnStartup(true);
-            host.setDeployXML(true);
-            // make it
-            try {
-                engine.addChild(host);
-            } catch (Exception e) {
-                System.out.println(e.toString());
-                return;
-            }
-
-            // STEP 5 - record the times and serialize our data
-            
-            // contextRecord array key:
-            // 0 = lastContext - stores time last context was made (millisecond value)
-            // 1 = throttleDate - stores day this record is for (days in year value)
-            // 2 = throttleValue - stores number of contexts created so far during this day
-            
-            // set the lastContext value to now
-            contextRecord[0] = String.valueOf(newNow.getTime());
-            
-            // add one to our throttleValue
-            int numContexts = Integer.parseInt(contextRecord[2]);
-            numContexts++;
-            contextRecord[2] = Integer.toString(numContexts);
-            
-            // serialize and save values
-            try {
-                ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream("mod_cfml.dat"));
-                os.writeObject(contextRecord);
-            } catch (Exception ex) {
-                if (loggingEnabled) {
-                    System.out.println("[mod_cfml] NOTICE: Serialization Write Exception: " + ex.toString());
-                }
-            }
-            
-            // STEP 6 - call ourselves again so we bypass localhost
-            if (!(this.tcURIParams == null) && this.tcURIParams.length() > 0) {
-                // if there are URI params, pass them
-                this.tcRedirectURL = this.tcURI + "?" + this.tcURIParams;
-            } else if (this.tcURI.equals("index.cfm") || this.tcURI.equals("/index.cfm")) {
-                // if we're hitting an index file with no uri params, we're probably
-                // getting a request for a TLD, so just redirect to a TLD
-                this.tcRedirectURL = "";
-            } else {
-                this.tcRedirectURL = this.tcURI;
-            }
-
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] Rredirect URL => '" + this.tcRedirectURL + "'");
-            }
-
-            response.sendRedirect(this.tcRedirectURL);
-            return;
-        } else {
+        if (!tcDocRootFile.isDirectory()) {
             // log the invalid directory if we have logging on
             if (loggingEnabled) {
-                System.out.println("[mod_cfml] FATAL: DocRoot value failed isDirectory() check. Directory may not exist, or Tomcat may not have permission to check it.");
+                System.out.println("[mod_cfml] FATAL: DocRoot value ["+this.tcDocRoot+"] failed isDirectory() check. Directory may not exist, or Tomcat may not have permission to check it.");
             }
+			getNext().invoke(request, response);
+			return;
         }
 
-        // otherwise send the request/response on it's way
-        getNext().invoke(request, response);
-        return;
+// everything checks out, create the new host
+// STEP 1 - Check/Create the XML config and work directories
 
+		// set the config directory value
+		this.newHostConfDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/conf/Catalina/" + this.tcHost;
+
+		File newHostConfDirFile = null;
+		file = new File(this.newHostConfDir);
+		newHostConfDirFile = file.getCanonicalFile();
+
+		// see if the directory exists already
+		if (!newHostConfDirFile.isDirectory()) {
+			// if it doesn't exist, create it
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Creating new config directory: " + newHostConfDirFile);
+			}
+			file.mkdir();
+		} else {
+			// if it does exist, remove it (and everything under it)
+			// because it's from an old config
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Removing old config directory: " + newHostConfDirFile);
+			}
+			deleteDir(file);
+			// now make the directory again so we start with a clean slate
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Creating new config directory: " + newHostConfDirFile);
+			}
+			file.mkdir();
+		}
+
+		// set the work directory value
+		this.newHostWorkDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/work/Catalina/" + this.tcHost;
+
+		File newHostWorkDirFile = null;
+		file = new File(this.newHostWorkDir);
+		newHostWorkDirFile = file.getCanonicalFile();
+
+		// see if the directory exists already
+		if (!newHostWorkDirFile.isDirectory()) {
+			// if it doesn't exist, ignore it
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Work directory doesn't exist: " + newHostWorkDirFile);
+			}
+		} else {
+			// if it does exist, remove it (and everything under it)
+			// because it's from an old config
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Removing old work directory: " + newHostWorkDirFile);
+			}
+			deleteDir(file);
+		}
+
+// STEP 2 - Write the context XML config
+		String newHostConfFile = newHostConfDirFile + "/ROOT.xml";
+		if (loggingEnabled) {
+			System.out.println("[mod_cfml] Creating context file: " + newHostConfFile);
+		}
+		PrintWriter out = new PrintWriter(new FileOutputStream(newHostConfFile));
+		out.println("<?xml version='1.0' encoding='utf-8'?>");
+		out.println("<Context docBase=\"" + this.tcDocRoot + "\">");
+		out.println("  <WatchedResource>WEB-INF/web.xml</WatchedResource>");
+		out.println("</Context>");
+		out.flush(); // write to the file
+		out.close(); // close out the file
+
+// STEP 3 - Create the context
+		StandardHost host = new StandardHost();
+		// log it
+		if (loggingEnabled) {
+			System.out.println("[mod_cfml] Creating New Host... ");
+			// System.out.println("setAppBase Value => " + tcDocRootFile.toString());
+			System.out.println("[mod_cfml] setName Value => " + this.tcHost);
+		}
+		host.addLifecycleListener(new HostConfig());
+		host.setAppBase("webapps");
+		// host.setAppBase(tcDocRootFile.toString());
+		host.setName(this.tcHost);
+		host.setAutoDeploy(true);
+		host.setDeployOnStartup(true);
+		host.setDeployXML(true);
+		// make it
+		try {
+			engine.addChild(host);
+		} catch (Exception e) {
+			System.out.println("[mod_cfml] ERROR: " + e.toString());
+			return;
+		}
+		
+		
+// STEP 4 - ensure the context config files and work directory exist
+		if (loggingEnabled) {
+			System.out.println("[mod_cfml] Wait for context? => " + (waitForContext > 0 ? "true (max. " + waitForContext + " seconds)" : "false") );
+		}
+		if ( waitForContext > 0 ) {
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Verifying context files...");
+			}
+			File tcContextXMLFile = null;
+			File tcContextXMLFilePointer = null;
+
+			tcContextXMLFilePointer = new File(newHostConfFile);
+			tcContextXMLFile = tcContextXMLFilePointer.getCanonicalFile();
+			// wait for the specified number of seconds
+			for (int i = 0; i < waitForContext; i++) {
+				// check to see if the directory exists
+				if (newHostConfDirFile.isDirectory()) {
+					// if it exists, check the file too
+					if ( tcContextXMLFile.isFile() ) {
+						// if the dir and file exist, check for the work directory
+						if ( newHostWorkDirFile.isDirectory() ) {
+							// if the work directory exists, end this loop
+							break;
+						}
+					}
+				}
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml] Waiting for context files: ["+i+"]");
+				}
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+				}
+			}
+
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Wait loop ended. Context files found? ["+ tcContextXMLFile.isFile() + "] WorkDir created by Tomcat? ["+newHostWorkDirFile.isDirectory()+"]");
+			}
+		}
+
+
+// STEP 5 - record the times and serialize our data
+		
+		// contextRecord array key:
+		// 0 = lastContext - stores time last context was made (millisecond value)
+		// 1 = throttleDate - stores day this record is for (days in year value)
+		// 2 = throttleValue - stores number of contexts created so far during this day
+		
+		// add 1 to our throttleValue
+		int numContexts = Integer.parseInt(contextRecord[2]);
+		numContexts++;
+		contextRecord[2] = Integer.toString(numContexts);
+		
+		// serialize and save values
+		try {
+			ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream("mod_cfml.dat"));
+			os.writeObject(contextRecord);
+			os.close();
+		} catch (Exception ex) {
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] NOTICE: Serialization Write Exception: " + ex.toString());
+			}
+		}
+		
+// STEP 6 - call ourselves again so we bypass localhost
+		if (!(this.tcURIParams == null) && this.tcURIParams.length() > 0) {
+			// if there are URI params, pass them
+			this.tcRedirectURL = this.tcURI + "?" + this.tcURIParams;
+		} else if (this.tcURI.equals("index.cfm") || this.tcURI.equals("/index.cfm")) {
+			// if we're hitting an index file with no uri params, we're probably
+			// getting a request for a TLD, so just redirect to a TLD
+			this.tcRedirectURL = "";
+		} else {
+			this.tcRedirectURL = this.tcURI;
+		}
+
+		if (loggingEnabled) {
+			System.out.println("[mod_cfml] Redirect URL => '" + this.tcRedirectURL + "'");
+		}
+
+		response.sendRedirect(this.tcRedirectURL);
+		return;
     }
 
     // create a seperate method for removing directories so we can call it
