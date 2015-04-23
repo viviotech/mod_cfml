@@ -11,7 +11,7 @@ package mod_cfml;
  * http://www.modcfml.org/
  * 
  * Version:
- * 1.0.29
+ * 1.0.30
  */
 
 // java
@@ -24,8 +24,14 @@ import java.io.ObjectOutputStream;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
 import java.lang.String;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.Date;
 import java.text.SimpleDateFormat;
+import java.util.List;
 
 // servlet
 import javax.servlet.ServletException;
@@ -53,6 +59,10 @@ public class core extends ValveBase implements Serializable {
     private int timeBetweenContexts = 30000; // 30 seconds
     private int maxContexts = 10;
     private boolean scanClassPaths = false;
+    private String allowedIPs = "";
+
+	private boolean allowLocalMachineIPs = true;
+    private List<String> allowedIPList = null;
 
     // methods for configurable params
     public boolean getLoggingEnabled() {
@@ -84,6 +94,20 @@ public class core extends ValveBase implements Serializable {
     }
     public void setScanClassPaths(boolean scanClassPaths) {
         this.scanClassPaths = scanClassPaths;
+    }
+    public String getAllowedIPs() {
+        return (allowedIPs);
+    }
+    public void setAllowedIPs(String allowedIPs) {
+        this.allowedIPs = allowedIPs;
+		/* by default, only allow from local machine */
+		if (allowedIPs == null || allowedIPs.isEmpty()) {
+			allowedIPList = null;
+			this.allowLocalMachineIPs = true;
+		} else {
+			allowedIPList = Arrays.asList( allowedIPs.replaceAll(" ", "").split(",") );
+			this.allowLocalMachineIPs = allowedIPList.contains("local");
+		}
     }
 
 	public boolean initInternalCalled = false;
@@ -128,6 +152,16 @@ public class core extends ValveBase implements Serializable {
             getNext().invoke(request, response);
             return;
         }
+
+		// check if remote IP is allowed to use mod_cfml
+		// (request should come proxied from the frontend webserver)
+		if (!isIPAllowed(request.getRemoteAddr())) {
+            if (loggingEnabled) {
+                System.out.println("[mod_cfml] FATAL: IP [" + request.getRemoteAddr() + "] is not allowed to send X-Tomcat-DocRoot header. Header value: [" + tcDocRoot + "]");
+            }
+            handleError(501, "Your IP address is not allowed to use the mod_cfml functionality!", response);
+            return;
+		}
 
         // Get the Host name value from the HTTP header
         tcHost = request.getHeader("Host");
@@ -554,9 +588,59 @@ public class core extends ValveBase implements Serializable {
 	}
 
 	public static void handleError(int statuscode, String msg, Response response) throws ServletException, IOException {
-		System.out.println("[mod_cfml] ERROR " + statuscode + ": " + msg);
+		System.out.println("[mod_cfml] ERROR (sent to client): " + statuscode + ": " + msg);
 		response.setContentType("text/html");
 		response.getWriter().write("<h3>Tomcat Mod_CFML error</h3><p>" + msg + "</p>");
 		response.setStatus(statuscode);
 	}
+
+
+	public boolean isIPAllowed(String ip) {
+		/* allow all? */
+		if (allowedIPs != null && allowedIPs.equals("*")) {
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] allowedIPs='*', so isIPAllowed=true");
+			}
+			return true;
+		}
+
+		/* localhost check */
+		if (this.allowLocalMachineIPs) {
+			if (isLocalIPAddress(ip)) {
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml] isIPAllowed: isLocalIPAddress('"+ip+"')=true");
+				}
+				return true;
+			}
+		}
+		/* check specified IPs */
+		if (allowedIPList != null) {
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] isIPAllowed: allowedIPList.contains('"+ip+"') = " + allowedIPList.contains(ip));
+			}
+			return (allowedIPList.contains(ip));
+		}
+		return false;
+	}
+
+
+	private static boolean isLocalIPAddress(String ip) {
+		InetAddress addr;
+		try {
+			addr = InetAddress.getByName(ip);
+		} catch (UnknownHostException e) {
+			return false;
+		}
+		// Check if the address is a valid special local or loop back
+		if (addr.isAnyLocalAddress() || addr.isLoopbackAddress()) {
+			return true;
+		}
+		// Check if the address is defined on any interface
+		try {
+			return NetworkInterface.getByInetAddress(addr) != null;
+		} catch (SocketException e) {
+			return false;
+		}
+	}
+
 }
