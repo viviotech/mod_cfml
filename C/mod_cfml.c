@@ -249,6 +249,15 @@ static int add_alias_header(request_rec* r)
 
 static int modcfml_handler(request_rec *r)
 {
+	// security: check if there already is a DocRoot header coming in,
+	// and if so, remove the header
+	if (apr_table_get(r->headers_in, "X-Tomcat-DocRoot") != NULL) {
+		ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server,
+			"Incoming X-Tomcat-DocRoot header found, while we have not set it yet! Hacking attempt? Header value => %s",
+			apr_table_get(r->headers_in, "X-Tomcat-DocRoot"));
+		apr_table_unset(r->headers_in, "X-Tomcat-DocRoot");
+	}
+
 	char *ext;
 	// get the file extension
 	ext = strrchr(r->filename, '.');
