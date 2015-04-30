@@ -14,6 +14,7 @@
 	LogHeaders [true|false]
 	LogHandlers [true|false]
 	LogAliases [true|false]
+	ModCFML_SharedKey "secret key also set in the Tomcat valve config"
 #
 ############################################################################## */
 /* Include the required headers from httpd */
@@ -42,6 +43,7 @@ typedef struct {
 	bool LogHeaders;
 	bool LogHandlers;
 	bool LogAliases;
+	const char *SharedKey;
 } modcfml_config;
 
 /* copied from mod_alias.c, Apache httpd 2.4.12 source code */
@@ -104,6 +106,13 @@ const char *modcfml_set_cfmlhandlers(cmd_parms *cmd, void *cfg, const char *arg)
 	return NULL;
 }
 
+/* Handler for the "ModCFML_SharedKey" directive */
+const char *modcfml_set_sharedkey(cmd_parms *cmd, void *cfg, const char *arg)
+{
+	config.SharedKey = arg;
+	return NULL;
+}
+
 /*
  ==============================================================================
  The directive structure for our name tag:
@@ -111,6 +120,7 @@ const char *modcfml_set_cfmlhandlers(cmd_parms *cmd, void *cfg, const char *arg)
  */
 static const command_rec modcfml_directives[] =
 {
+	AP_INIT_TAKE1("ModCFML_SharedKey", modcfml_set_sharedkey, NULL, RSRC_CONF, "Optional secret key to validate at the Tomcat side"),
 	AP_INIT_TAKE1("CFMLHandlers", modcfml_set_cfmlhandlers, NULL, RSRC_CONF, "Which file types to work with"),
 	AP_INIT_TAKE1("LogHandlers", modcfml_set_loghandlers, NULL, RSRC_CONF, "Logging of the CFMLHandlers true/false"),
 	AP_INIT_TAKE1("LogAliases", modcfml_set_logaliases, NULL, RSRC_CONF, "Logging of the available Aliases true/false"),
@@ -306,6 +316,9 @@ static int modcfml_handler(request_rec *r)
 	// all good: add Tomcat headers
 	apr_table_set(r->headers_in, "X-Tomcat-DocRoot", ap_document_root(r));
 	apr_table_set(r->headers_in, "X-Webserver-Context", r->server->server_hostname);
+	if (config.SharedKey != NULL) {
+		apr_table_set(r->headers_in, "X-ModCFML-SharedKey", config.SharedKey);
+	}
 
 	// new: add a header X-VDirs, which contains all known aliases for the VHost
 	add_alias_header(r);

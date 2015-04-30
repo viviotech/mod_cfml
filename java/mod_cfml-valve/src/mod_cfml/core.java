@@ -11,7 +11,7 @@ package mod_cfml;
  * http://www.modcfml.org/
  * 
  * Version:
- * 1.0.30
+ * 1.0.31
  */
 
 // java
@@ -59,10 +59,7 @@ public class core extends ValveBase implements Serializable {
     private int timeBetweenContexts = 30000; // 30 seconds
     private int maxContexts = 10;
     private boolean scanClassPaths = false;
-    private String allowedIPs = "";
-
-	private boolean allowLocalMachineIPs = true;
-    private List<String> allowedIPList = null;
+    private String sharedKey = "";
 
     // methods for configurable params
     public boolean getLoggingEnabled() {
@@ -95,19 +92,11 @@ public class core extends ValveBase implements Serializable {
     public void setScanClassPaths(boolean scanClassPaths) {
         this.scanClassPaths = scanClassPaths;
     }
-    public String getAllowedIPs() {
-        return (allowedIPs);
+    public String getSharedKey() {
+        return (sharedKey);
     }
-    public void setAllowedIPs(String allowedIPs) {
-        this.allowedIPs = allowedIPs;
-		/* by default, only allow from local machine */
-		if (allowedIPs == null || allowedIPs.isEmpty()) {
-			allowedIPList = null;
-			this.allowLocalMachineIPs = true;
-		} else {
-			allowedIPList = Arrays.asList( allowedIPs.replaceAll(" ", "").split(",") );
-			this.allowLocalMachineIPs = allowedIPList.contains("local");
-		}
+    public void setSharedKey(String sharedKey) {
+        this.sharedKey = sharedKey;
     }
 
 	public boolean initInternalCalled = false;
@@ -153,14 +142,15 @@ public class core extends ValveBase implements Serializable {
             return;
         }
 
-		// check if remote IP is allowed to use mod_cfml
+		// check if secret key is given in the valve config. if so, make sure the client sent it as well
 		// (request should come proxied from the frontend webserver)
-		if (!isIPAllowed(request.getRemoteAddr())) {
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] FATAL: IP [" + request.getRemoteAddr() + "] is not allowed to send X-Tomcat-DocRoot header. Header value: [" + tcDocRoot + "]");
-            }
-            handleError(501, "Your IP address is not allowed to use the mod_cfml functionality!", response);
-            return;
+		if (sharedKey != null && !sharedKey.isEmpty())
+		{
+			String incomingKey = request.getHeader("X-ModCFML-SharedKey");
+			if (incomingKey == null || !incomingKey.equals(sharedKey)) {
+				handleError(503, "mod_cfml request authentication failed!", response);
+				return;
+			}
 		}
 
         // Get the Host name value from the HTTP header
@@ -592,55 +582,6 @@ public class core extends ValveBase implements Serializable {
 		response.setContentType("text/html");
 		response.getWriter().write("<h3>Tomcat Mod_CFML error</h3><p>" + msg + "</p>");
 		response.setStatus(statuscode);
-	}
-
-
-	public boolean isIPAllowed(String ip) {
-		/* allow all? */
-		if (allowedIPs != null && allowedIPs.equals("*")) {
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] allowedIPs='*', so isIPAllowed=true");
-			}
-			return true;
-		}
-
-		/* localhost check */
-		if (this.allowLocalMachineIPs) {
-			if (isLocalIPAddress(ip)) {
-				if (loggingEnabled) {
-					System.out.println("[mod_cfml] isIPAllowed: isLocalIPAddress('"+ip+"')=true");
-				}
-				return true;
-			}
-		}
-		/* check specified IPs */
-		if (allowedIPList != null) {
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] isIPAllowed: allowedIPList.contains('"+ip+"') = " + allowedIPList.contains(ip));
-			}
-			return (allowedIPList.contains(ip));
-		}
-		return false;
-	}
-
-
-	private static boolean isLocalIPAddress(String ip) {
-		InetAddress addr;
-		try {
-			addr = InetAddress.getByName(ip);
-		} catch (UnknownHostException e) {
-			return false;
-		}
-		// Check if the address is a valid special local or loop back
-		if (addr.isAnyLocalAddress() || addr.isLoopbackAddress()) {
-			return true;
-		}
-		// Check if the address is defined on any interface
-		try {
-			return NetworkInterface.getByInetAddress(addr) != null;
-		} catch (SocketException e) {
-			return false;
-		}
 	}
 
 }
