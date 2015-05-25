@@ -263,7 +263,7 @@ static int modcfml_handler(request_rec *r)
 	// and if so, remove the header
 	if (apr_table_get(r->headers_in, "X-Tomcat-DocRoot") != NULL) {
 		ap_log_error(APLOG_MARK, APLOG_ERR, 0, r->server,
-			"Incoming X-Tomcat-DocRoot header found, while we have not set it yet! Hacking attempt? Header value => %s",
+			"Incoming X-Tomcat-DocRoot header found, while we have not set it yet! Header value => %s",
 			apr_table_get(r->headers_in, "X-Tomcat-DocRoot"));
 		apr_table_unset(r->headers_in, "X-Tomcat-DocRoot");
 	}
