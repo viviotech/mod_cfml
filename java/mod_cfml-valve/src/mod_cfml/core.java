@@ -11,7 +11,7 @@ package mod_cfml;
  * http://www.modcfml.org/
  * 
  * Version:
- * 1.0.31
+ * 1.0.32
  */
 
 // java
@@ -24,14 +24,8 @@ import java.io.ObjectOutputStream;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
 import java.lang.String;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.util.Arrays;
 import java.util.Date;
-import java.text.SimpleDateFormat;
-import java.util.List;
+// import java.text.SimpleDateFormat;
 
 // servlet
 import javax.servlet.ServletException;
@@ -55,9 +49,9 @@ public class core extends ValveBase implements Serializable {
     
     // declare configurable param defaults
     private boolean loggingEnabled = false;
-    private int waitForContext = 3;
-    private int timeBetweenContexts = 30000; // 30 seconds
-    private int maxContexts = 10;
+    private int waitForContext = 3; // 3 seconds
+    private int timeBetweenContexts = 2000; // 2 seconds
+    private int maxContexts = 200;
     private boolean scanClassPaths = false;
     private String sharedKey = "";
 
@@ -124,11 +118,6 @@ public class core extends ValveBase implements Serializable {
 			initInternalCalled=false;
 		}
 
-        // make sure waitforcontext is a positive number
-        if ( waitForContext < 0 ) {
-            // if it's not valid, set to default
-            waitForContext = 3;
-        }
         // Get the DocRoot value from the HTTP header
         tcDocRoot = request.getHeader("X-Tomcat-DocRoot");
 
@@ -271,7 +260,6 @@ public class core extends ValveBase implements Serializable {
 				// log it
 				if (loggingEnabled) {
 					System.out.println("[mod_cfml] lastContext = " + contextRecord[0]);
-					System.out.println("[mod_cfml] throttleDate = " + contextRecord[1]);
 					System.out.println("[mod_cfml] throttleValue = " + contextRecord[2]);
 				}
 			}
@@ -287,14 +275,14 @@ public class core extends ValveBase implements Serializable {
             
             // contextRecord array key:
             // 0 = lastContext - stores time last context was made (millisecond value)
-            // 1 = throttleDate - stores day this record is for (days in year value)
+            // not in use anymore: 1 = throttleDate - stores day this record is for (days in year value)
             // 2 = throttleValue - stores number of contexts created so far during this day
             
             contextRecord[0] = null;
             
             // Set the value of throttleDate to today
-            SimpleDateFormat dayInYear = new SimpleDateFormat ("D");
-            contextRecord[1] = dayInYear.format(newNow);
+            // SimpleDateFormat dayInYear = new SimpleDateFormat ("D");
+            contextRecord[1] = 0;// not in use anymore: dayInYear.format(newNow);
             
             // Set the value of throttleValue to 0
             contextRecord[2] = "0";
@@ -302,20 +290,8 @@ public class core extends ValveBase implements Serializable {
             if (loggingEnabled) {
                 System.out.println("[mod_cfml] New contextRecord Array initialized...");
                 System.out.println("[mod_cfml] lastContext = " + contextRecord[0]);
-                System.out.println("[mod_cfml] throttleDate = " + contextRecord[1]);
                 System.out.println("[mod_cfml] throttleValue = " + contextRecord[2]);
             }
-        }
-        
-        // verify throttleDate value
-        SimpleDateFormat dayInYear = new SimpleDateFormat ("D");
-        if ( Integer.parseInt(contextRecord[1]) != Integer.parseInt(dayInYear.format(newNow)) ) {
-            if (loggingEnabled) {
-                System.out.println("[mod_cfml] New day detected. Reinitializing throttleDate and throttleValue.");
-            }
-            // if throttleDate is not today, reset it and throttleValue as well
-            contextRecord[1] = dayInYear.format(newNow);
-            contextRecord[2] = "0";
         }
 
 		// verify timeBetweenContexts
@@ -331,7 +307,7 @@ public class core extends ValveBase implements Serializable {
 		// verify maxContexts
 		if (!addAsAlias && Integer.parseInt(contextRecord[2]) >= maxContexts) {
 			// if maxContexts reached, refuse the request for today
-			handleError(503, "MaxContexts limit reached. Try again tomorrow.", response);
+			handleError(503, "MaxContexts limit reached. No more contexts can be created!", response);
 			return;
 		}
 
