@@ -272,11 +272,27 @@ static int modcfml_handler(request_rec *r)
 
 	char *ext;
 	// get the file extension
-	ext = strrchr(r->filename, '.');
+	ext = strrchr(r->uri, '.');
 
 	// if no file extension, get outta here
 	if (!ext) {
 		return DECLINED;
+	}
+
+	// does the extension contain path_info at the end?
+	const char *slash = "/";
+	if (strstr(ext, slash))
+	{
+		// set the path_info header for Lucee/Railo/OBD
+		apr_table_set(r->headers_in, "xajp-path-info", strrchr(ext, '/') );
+
+		// Awesome awesome stuff (for C n00bs like me at least):
+		// ext is a pointer to a part of the char array of r->uri
+		// strtok sets a \0 at the position where it finds a slash (start of path_info)
+		// By doing this, we:
+		// a) stripped off the path_info from ext
+		// b) stripped off the path_info from r->uri
+		strtok(ext, slash);
 	}
 
 	// simple check to see if extension might match, as a pre-filter
@@ -287,7 +303,6 @@ static int modcfml_handler(request_rec *r)
 
 	// we will do another substring check, but now while looping through the actual extensions
 	char *handlers = malloc( (strlen(config.CFMLHandlers) + 1) * sizeof(char) );
-//	char handlers[ strlen(config.CFMLHandlers) + 1 ];
 	memset(handlers, '\0', strlen(handlers));
 	strcpy(handlers, config.CFMLHandlers);
 	
