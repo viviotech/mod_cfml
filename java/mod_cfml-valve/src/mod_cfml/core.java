@@ -11,7 +11,7 @@ package mod_cfml;
  * http://www.modcfml.org/
  * 
  * Version:
- * 1.0.32
+ * 1.1.01
  */
 
 // java
@@ -282,7 +282,7 @@ public class core extends ValveBase implements Serializable {
             
             // Set the value of throttleDate to today
             // SimpleDateFormat dayInYear = new SimpleDateFormat ("D");
-            contextRecord[1] = 0;// not in use anymore: dayInYear.format(newNow);
+            contextRecord[1] = "0";// not in use anymore: dayInYear.format(newNow);
             
             // Set the value of throttleValue to 0
             contextRecord[2] = "0";
@@ -451,44 +451,42 @@ public class core extends ValveBase implements Serializable {
 		
 // STEP 5 - ensure the context config files and work directory exist
 		if (loggingEnabled) {
-			System.out.println("[mod_cfml] Wait for context? => " + (waitForContext > 0 ? "true (max. " + waitForContext + " seconds)" : "false") );
+			System.out.println("[mod_cfml] Verifying context files...");
 		}
-		if ( waitForContext > 0 ) {
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Verifying context files...");
-			}
-			File tcContextXMLFile = null;
-			File tcContextXMLFilePointer = null;
+		boolean _found = false;
+		File tcContextXMLFile = null;
+		File tcContextXMLFilePointer = null;
 
-			tcContextXMLFilePointer = new File(newHostConfFile);
-			tcContextXMLFile = tcContextXMLFilePointer.getCanonicalFile();
-			// wait for the specified number of seconds
-			for (int i = 0; i < waitForContext; i++) {
-				// check to see if the directory exists
-				if (newHostConfDirFile.isDirectory()) {
-					// if it exists, check the file too
-					if ( tcContextXMLFile.isFile() ) {
-						// if the dir and file exist, check for the work directory
-						if ( newHostWorkDirFile.isDirectory() ) {
-							// if the work directory exists, end this loop
-							break;
-						}
+		tcContextXMLFilePointer = new File(newHostConfFile);
+		tcContextXMLFile = tcContextXMLFilePointer.getCanonicalFile();
+		// wait for the specified number of seconds
+		for (int i = 0; i <= waitForContext; i++) {
+			// check to see if the directory exists
+			if (newHostConfDirFile.isDirectory()) {
+				// if it exists, check the file too
+				if ( tcContextXMLFile.isFile() ) {
+					// if the dir and file exist, check for the work directory
+					if ( newHostWorkDirFile.isDirectory() ) {
+						// if the work directory exists, end this loop
+						_found = true;
+						break;
 					}
 				}
+			}
+			if (waitForContext > i) {
 				if (loggingEnabled) {
-					System.out.println("[mod_cfml] Waiting for context files: ["+i+"]");
+					System.out.println("[mod_cfml] Context files do not yet exist! Will check again after 1 second... ("+(i+1)+")");
 				}
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e) {
 				}
-			}
-
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Wait loop ended. Context files found? ["+ tcContextXMLFile.isFile() + "] WorkDir created by Tomcat? ["+newHostWorkDirFile.isDirectory()+"]");
+			} else {
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml] ERROR: Context files do not exist! Will continue, but likely to result in error.");
+				}
 			}
 		}
-
 
 // STEP 6 - record the times and serialize our data
 		
