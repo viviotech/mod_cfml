@@ -1,4 +1,4 @@
-/* ##############################################################################
+﻿/* ##############################################################################
 # package:		mod_cfml.c
 # version:		1.0.0
 # author:		Paul Klinkenberg (paul@lucee.nl)
@@ -23,6 +23,8 @@
 #include "http_protocol.h"
 #include "http_request.h"
 #include "http_log.h"
+
+#include <stdbool.h>
 
 #ifdef APLOG_USE_MODULE
 	APLOG_USE_MODULE(modcfml);
@@ -284,7 +286,8 @@ static int modcfml_handler(request_rec *r)
 	}
 
 	// we will do another substring check, but now while looping through the actual extensions
-	char handlers[ strlen(config.CFMLHandlers) + 1 ];
+	char *handlers = malloc( (strlen(config.CFMLHandlers) + 1) * sizeof(char) );
+//	char handlers[ strlen(config.CFMLHandlers) + 1 ];
 	memset(handlers, '\0', strlen(handlers));
 	strcpy(handlers, config.CFMLHandlers);
 	
@@ -307,6 +310,7 @@ static int modcfml_handler(request_rec *r)
 		}
 		handler = strtok(NULL, delim);
 	}
+	free(handlers);
 
 	// if file extension is not to be handled by us
 	if (! found) {
