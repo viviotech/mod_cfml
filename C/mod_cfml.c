@@ -10,11 +10,12 @@
 #
 	LoadModule modcfml_module	 [your path to]/mod_cfml.so
 	CFMLHandlers ".cfm .cfc .cfml"
-	# optional:
-	LogHeaders [true|false]
-	LogHandlers [true|false]
-	LogAliases [true|false]
 	ModCFML_SharedKey "secret key also set in the Tomcat valve config"
+	# optional: (enable to change the default setting)
+	# LogHeaders  true
+	# LogHandlers true
+	# LogAliases  true
+	# VDirHeader  false
 #
 ############################################################################## */
 /* Include the required headers from httpd */
@@ -23,8 +24,50 @@
 #include "http_protocol.h"
 #include "http_request.h"
 #include "http_log.h"
-
+#include "apr_strings.h"
 #include <stdbool.h>
+#include <string.h>
+#include <assert.h>
+
+/* ###################### basename function, for windows ##################### */
+#if defined _WIN32 || defined __WIN32__ || defined __EMX__ || defined __DJGPP__
+	/* Win32, OS/2, DOS */
+	# define HAS_DEVICE(P) \
+	((((P)[0] >= 'A' && (P)[0] <= 'Z') || ((P)[0] >= 'a' && (P)[0] <= 'z')) \
+	&& (P)[1] == ':')
+	# define FILESYSTEM_PREFIX_LEN(P) (HAS_DEVICE (P) ? 2 : 0)
+	# define ISSLASH(C) ((C) == '/' || (C) == '\\')
+#endif
+
+#ifndef FILESYSTEM_PREFIX_LEN
+	# define FILESYSTEM_PREFIX_LEN(Filename) 0
+#endif
+
+#ifndef ISSLASH
+	# define ISSLASH(C) ((C) == '/')
+#endif
+
+char *basename(char const *name)
+{
+	char const *base = name += FILESYSTEM_PREFIX_LEN (name);
+	int all_slashes = 1;
+	char const *p;
+	for (p = name; *p; p++)
+	{
+		if (ISSLASH (*p))
+			base = p + 1;
+		else
+			all_slashes = 0;
+	}
+	/* If NAME is all slashes, arrange to return `/'. */
+	if (*base == '\0' && ISSLASH (*name) && all_slashes)
+		--base;
+	/* Make sure the last byte is not a slash. */
+	assert(all_slashes || !ISSLASH (*(p - 1)));
+
+	return (char *) base;
+}
+/* ###################### END basename function, for windows ################# */
 
 #ifdef APLOG_USE_MODULE
 	APLOG_USE_MODULE(modcfml);
@@ -45,6 +88,7 @@ typedef struct {
 	bool LogHeaders;
 	bool LogHandlers;
 	bool LogAliases;
+	bool VDirHeader;
 	const char *SharedKey;
 } modcfml_config;
 
@@ -101,6 +145,17 @@ const char *modcfml_set_logaliases(cmd_parms *cmd, void *cfg, const char *arg)
 	return NULL;
 }
 
+/* Handler for the "VDirHeader" directive */
+const char *modcfml_set_vdirheader(cmd_parms *cmd, void *cfg, const char *arg)
+{
+	if(strcasecmp(arg, "true") == 0) {
+		config.VDirHeader = true;
+	}
+	else config.VDirHeader = false;
+	return NULL;
+}
+
+
 /* Handler for the "CFMLHandlers" directive */
 const char *modcfml_set_cfmlhandlers(cmd_parms *cmd, void *cfg, const char *arg)
 {
@@ -126,6 +181,7 @@ static const command_rec modcfml_directives[] =
 	AP_INIT_TAKE1("CFMLHandlers", modcfml_set_cfmlhandlers, NULL, RSRC_CONF, "Which file types to work with"),
 	AP_INIT_TAKE1("LogHandlers", modcfml_set_loghandlers, NULL, RSRC_CONF, "Logging of the CFMLHandlers true/false"),
 	AP_INIT_TAKE1("LogAliases", modcfml_set_logaliases, NULL, RSRC_CONF, "Logging of the available Aliases true/false"),
+	AP_INIT_TAKE1("VDirHeader", modcfml_set_vdirheader, NULL, RSRC_CONF, "Add request header x-vdirs with aliases info true/false"),
 	AP_INIT_TAKE1("LogHeaders", modcfml_set_logheaders, NULL, RSRC_CONF, "Logging of the incoming headers true/false"),
 	{ NULL }
 };
@@ -160,6 +216,7 @@ static module *find_module(char *name, request_rec* r)
 static void register_hooks(apr_pool_t *pool) 
 {
 	config.CFMLHandlers = ".cfm .cfc .cfml";
+	config.VDirHeader = true;
 	
 	/* Hook the request handler */
 	ap_hook_handler(modcfml_handler, NULL, NULL, APR_HOOK_FIRST);
@@ -272,11 +329,27 @@ static int modcfml_handler(request_rec *r)
 
 	char *ext;
 	// get the file extension
-	ext = strrchr(r->filename, '.');
+	ext = strrchr(r->uri, '.');
 
 	// if no file extension, get outta here
 	if (!ext) {
 		return DECLINED;
+	}
+
+	// does the extension contain path_info at the end?
+	const char *slash = "/";
+	if (strstr(ext, slash))
+	{
+		// set the path_info header for Lucee/Railo/OBD
+		apr_table_set(r->headers_in, "xajp-path-info", strrchr(ext, '/') );
+
+		// Awesome awesome stuff (for C n00bs like me at least):
+		// ext is a pointer to a part of the char array of r->uri
+		// strtok sets a \0 at the position where it finds a slash (start of path_info)
+		// By doing this, we:
+		// a) stripped off the path_info from ext
+		// b) stripped off the path_info from r->uri
+		strtok(ext, slash);
 	}
 
 	// simple check to see if extension might match, as a pre-filter
@@ -287,7 +360,6 @@ static int modcfml_handler(request_rec *r)
 
 	// we will do another substring check, but now while looping through the actual extensions
 	char *handlers = malloc( (strlen(config.CFMLHandlers) + 1) * sizeof(char) );
-//	char handlers[ strlen(config.CFMLHandlers) + 1 ];
 	memset(handlers, '\0', strlen(handlers));
 	strcpy(handlers, config.CFMLHandlers);
 	
@@ -317,15 +389,32 @@ static int modcfml_handler(request_rec *r)
 		return DECLINED;
 	}
 
+	// create unique name for this VirtualHost context
+	char *server_hostname = strdup( r->server->server_hostname );
+	char *config_filepath = strdup( r->server->defn_name );
+	char *config_filename = basename(config_filepath);
+	if (config_filename == NULL) {
+		config_filename = "unknown-conf";
+	}
+	char line_number[10];
+	sprintf(line_number, "l%d", r->server->defn_line_number);
+	char *unique_vhost_id = apr_pstrcat(r->pool, server_hostname, "-", config_filename, line_number, NULL);
+
 	// all good: add Tomcat headers
 	apr_table_set(r->headers_in, "X-Tomcat-DocRoot", ap_document_root(r));
-	apr_table_set(r->headers_in, "X-Webserver-Context", r->server->server_hostname);
+	apr_table_set(r->headers_in, "X-Webserver-Context", unique_vhost_id);
+
+	free(server_hostname);
+	free(config_filepath);
+
 	if (config.SharedKey != NULL) {
 		apr_table_set(r->headers_in, "X-ModCFML-SharedKey", config.SharedKey);
 	}
 
 	// new: add a header X-VDirs, which contains all known aliases for the VHost
-	add_alias_header(r);
+	if (config.VDirHeader) {
+		add_alias_header(r);
+	}
 
 	if (config.LogHeaders == true) {
 		ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server,
