@@ -215,19 +215,11 @@ static module *find_module(char *name, request_rec* r)
 /* register_hooks: Adds a hook to the httpd process */
 static void register_hooks(apr_pool_t *pool)
 {
-    config.CFMLHandlers = ".cfm .cfc .cfml";
-    config.VDirHeader = true;
-    
-    // Sometimes the order of module execution is different in Apache2.4.
-    // This prevents mod_proxy from passing on the request to Tomcat/Jetty before we are done with it.
-    static const char * const aszSucc[] = {"mod_proxy.c", NULL};
-    
-    /* Hook the request handler */
-    ap_hook_fixups(modcfml_handler, NULL, aszSucc, APR_HOOK_FIRST);
-    
-    /*ap_hook_handler(modcfml_handler, NULL, NULL, APR_HOOK_FIRST);*/
-    
-    
+	config.CFMLHandlers = ".cfm .cfc .cfml";
+	config.VDirHeader = true;
+	/* Make sure this handler is called before mod_proxy / mod_jk is called,
+	   by setting hook order to APR_HOOK_FIRST - 1 */
+	ap_hook_handler(modcfml_handler, NULL, NULL, APR_HOOK_FIRST - 1);
 }
 
 static int print_header(void* rec, const char* key, const char* value)
