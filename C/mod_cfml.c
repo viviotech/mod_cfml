@@ -25,6 +25,7 @@
 #include "http_request.h"
 #include "http_log.h"
 #include "apr_strings.h"
+#include "http_config.h"
 #include <stdbool.h>
 #include <string.h>
 #include <assert.h>
