@@ -50,7 +50,7 @@
 	# define ISSLASH(C) ((C) == '/')
 #endif
 
-static char *basename(char const *name)
+char *getbasename(char const *name)
 {
 	char const *base = name += FILESYSTEM_PREFIX_LEN (name);
 	int all_slashes = 1;
@@ -378,7 +378,7 @@ static int modcfml_handler(request_rec *r)
 	char *server_hostname = strdup( r->server->server_hostname );
 	char *config_filepath = strdup( r->server->defn_name );
 
-	char *config_filename = basename( config_filepath == NULL ? "server-conf" : config_filepath );
+	char *config_filename = config_filepath == NULL ? "server-conf" : getbasename(config_filepath);
 	if (config_filename == NULL) {
 		config_filename = "server-conf";
 	}
