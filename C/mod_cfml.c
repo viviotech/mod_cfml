@@ -48,6 +48,8 @@
 	# define ISSLASH(C) ((C) == '/')
 #endif
 
+AP_DECLARE_DATA extern module **ap_loaded_modules;
+
 char *basename(char const *name)
 {
 	char const *base = name += FILESYSTEM_PREFIX_LEN (name);
