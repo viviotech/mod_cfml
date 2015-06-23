@@ -28,6 +28,7 @@
 #include "http_core.h"
 #include "http_log.h"
 #include "apr_strings.h"
+#include <string.h>
 #include <assert.h>
 #include <http_config.h>
 #include <ctype.h>
@@ -376,7 +377,7 @@ static int modcfml_handler(request_rec *r)
 
 	// create unique name for this VirtualHost context
 	char *server_hostname = strdup( r->server->server_hostname );
-	char *config_filepath = strdup( r->server->defn_name );
+	char *config_filepath = r->server->defn_name == NULL ? NULL : strdup( r->server->defn_name );
 
 	char *config_filename = config_filepath == NULL ? "server-conf" : getbasename(config_filepath);
 	if (config_filename == NULL) {
