@@ -32,9 +32,11 @@
 #include <assert.h>
 #include <http_config.h>
 #include <ctype.h>
+#include <stdlib.h>
 
 /* ###################### basename function, for windows ##################### */
 #if defined _WIN32 || defined __WIN32__ || defined __EMX__ || defined __DJGPP__
+#include <malloc.h>
 	/* Win32, OS/2, DOS */
 	# define HAS_DEVICE(P) \
 	((((P)[0] >= 'A' && (P)[0] <= 'Z') || ((P)[0] >= 'a' && (P)[0] <= 'z')) \
@@ -124,7 +126,6 @@ const char *modcfml_set_logheaders (cmd_parms *cmd, void *cfg, const char *arg)
     config.LogHeaders = strcasecmp(arg, "true") == 0 ? 1:0;
 	return NULL;
 }
-
 /* Handler for the "LogHandlers" directive */
 const char *modcfml_set_loghandlers(cmd_parms *cmd, void *cfg, const char *arg)
 {
@@ -215,14 +216,22 @@ static int print_header(void* rec, const char* key, const char* value)
 	return 1;
 }
 
-static char* copy_without_trailing_slash(const char* source)
+static char *copy_without_trailing_slash(const char* source)
 {
-	int pathlen = strlen(source);
+	void* tmpptr;
+	char* dest;
+	size_t pathlen = strlen(source);
 	if (pathlen > 1 && (strcmp(&source[ pathlen - 1 ], "/") == 0 || strcmp(&source[ pathlen - 1 ], "\\") == 0))
 	{
 		pathlen = pathlen - 1;
 	}
-	char* dest = (char*)malloc( pathlen + 1 );
+
+	tmpptr = malloc( pathlen + 1 );
+	if (tmpptr==NULL) {
+		return NULL;
+	}
+
+	dest = (char*) tmpptr;
 	if (dest != NULL)
 	{
 		memcpy(dest, source, pathlen);
@@ -234,6 +243,18 @@ static char* copy_without_trailing_slash(const char* source)
 
 static int add_alias_header(request_rec* r)
 {
+	ap_conf_vector_t *sconf;
+	void *tmpConf;
+	alias_server_conf *serverconf;
+	apr_array_header_t *aliases;
+	alias_entry *entries;
+	char * header_string = "";
+	char * temp_str;
+	char * fake = 0;
+	char * real = 0;
+	int i;
+	alias_entry *alias;
+
 	module *aliasmodule = ap_find_linked_module("mod_alias.c");
 	
 	if (! aliasmodule)
@@ -245,24 +266,27 @@ static int add_alias_header(request_rec* r)
 		return 1;
 	}
 	
-	ap_conf_vector_t *sconf = r->server->module_config;
-	alias_server_conf *serverconf = ap_get_module_config(sconf, aliasmodule);
-	apr_array_header_t *aliases = serverconf->aliases;
+	sconf = r->server->module_config;
+	tmpConf = ap_get_module_config(sconf, aliasmodule);
+	if (tmpConf == NULL) {
+		if (config.LogAliases==1) {
+			ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server,
+				"Printing aliases: [alias_module] was found, but it's config could not be retrieved!");
+		}
+		return 1;
+	}
+	serverconf = (alias_server_conf *)tmpConf;
+	aliases = serverconf->aliases;
 	
-	alias_entry *entries = (alias_entry *) aliases->elts;
+	entries = (alias_entry *) aliases->elts;
 
 	if (config.LogAliases==1) {
 		ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server,
 			"Printing aliases: [%d] found", aliases->nelts);
 	}
 	
-	char * header_string = "";
-	char * temp_str;
-	char * fake = 0;
-	char * real = 0;
-	int i;
 	for (i = 0; i < aliases->nelts; ++i) {
-		alias_entry *alias = &entries[i];
+		alias = &entries[i];
 
 		if (alias->regexp) {
 			if (config.LogAliases==1) {
@@ -281,7 +305,7 @@ static int add_alias_header(request_rec* r)
 			real = copy_without_trailing_slash(alias->real);
 			temp_str = header_string;
 			
-			if(fake != NULL && real != NULL && (header_string = malloc(strlen(temp_str)+strlen(fake)+strlen(real)+3)) != NULL)
+			if(fake != NULL && real != NULL && (header_string = (char *)malloc(strlen(temp_str)+strlen(fake)+strlen(real)+3)) != NULL)
 			{
 				header_string[0] = '\0';// ensures the memory is an empty string
 				strcat(header_string, temp_str);
@@ -303,6 +327,19 @@ static int add_alias_header(request_rec* r)
 
 static int modcfml_handler(request_rec *r)
 {
+	char *ext;
+	const char *slash = "/";
+	char *handlers;
+	char *handler;
+	const char delim[2] = " ";
+	int found = 0;
+	char *server_hostname;
+	char *config_filepath;
+	char *config_filename;
+	char line_number[10];
+	char *unique_vhost_id;
+    int i = 0;
+
 	// security: check if there already is a DocRoot header coming in,
 	// and if so, remove the header
 	if (apr_table_get(r->headers_in, "X-Tomcat-DocRoot") != NULL) {
@@ -312,7 +349,6 @@ static int modcfml_handler(request_rec *r)
 		apr_table_unset(r->headers_in, "X-Tomcat-DocRoot");
 	}
 
-	char *ext;
 	// get the file extension
 	ext = strrchr(r->uri, '.');
 
@@ -322,7 +358,6 @@ static int modcfml_handler(request_rec *r)
 	}
 
 	// does the extension contain path_info at the end?
-	const char *slash = "/";
 	if (strstr(ext, slash))
 	{
 		// set the path_info header for Lucee/Railo/OBD
@@ -344,13 +379,10 @@ static int modcfml_handler(request_rec *r)
 	}
 
 	// we will do another substring check, but now while looping through the actual extensions
-	char *handlers = malloc( (strlen(config.CFMLHandlers) + 1) * sizeof(char) );
+	handlers = (char *)malloc( (size_t)((strlen(config.CFMLHandlers) + 1) * sizeof(char)) );
 	memset(handlers, '\0', strlen(handlers));
 	strcpy(handlers, config.CFMLHandlers);
 	
-	char *handler;
-	const char delim[2] = " ";
-	int found = 0;
 	handler = strtok(handlers, delim);
 	while (handler != NULL)
 	{
@@ -376,18 +408,16 @@ static int modcfml_handler(request_rec *r)
 
 
 	// create unique name for this VirtualHost context
-	char *server_hostname = strdup( r->server->server_hostname );
-	char *config_filepath = r->server->defn_name == NULL ? NULL : strdup( r->server->defn_name );
+	server_hostname = strdup( r->server->server_hostname );
+	config_filepath = r->server->defn_name == NULL ? NULL : strdup( r->server->defn_name );
 
-	char *config_filename = config_filepath == NULL ? "server-conf" : getbasename(config_filepath);
+	config_filename = config_filepath == NULL ? "server-conf" : getbasename(config_filepath);
 	if (config_filename == NULL) {
 		config_filename = "server-conf";
 	}
-	char line_number[10];
 	sprintf(line_number, "l%d", r->server->defn_line_number);
-	char *unique_vhost_id = apr_pstrcat(r->pool, server_hostname, "-", config_filename, line_number, NULL);
+	unique_vhost_id = apr_pstrcat(r->pool, server_hostname, "-", config_filename, line_number, NULL);
     // remove any special characters from the unique_vhost_id, especially colons (:) which are used in IPV6
-    int i = 0;
     for(; i < strlen(unique_vhost_id); i++)
     {
         if (!isalnum(unique_vhost_id[i]))
