@@ -13,6 +13,7 @@ package mod_cfml;
  * Version:
  * 1.1.01
  * 1.1.03: June 22, 2015, Paul Klinkenberg
+ * 1.1.04: June 24, 2015, Paul Klinkenberg
  */
 
 // java
@@ -504,13 +505,9 @@ public class core extends ValveBase implements Serializable {
 
 // STEP 7 - call ourselves again so we bypass localhost
 		String tcRedirectURL;
-		if (!(tcURIParams == null) && tcURIParams.length() > 0) {
+		if (tcURIParams != null && tcURIParams.length() > 0) {
 			// if there are URI params, pass them
 			tcRedirectURL = tcURI + "?" + tcURIParams;
-		} else if (tcURI.equals("index.cfm") || tcURI.equals("/index.cfm")) {
-			// if we're hitting an index file with no uri params, we're probably
-			// getting a request for a TLD, so just redirect to a TLD
-			tcRedirectURL = "";
 		} else {
 			tcRedirectURL = tcURI;
 		}
