@@ -10,6 +10,8 @@
 #				Updated code to be more compatible with old Windows C89 (boolean to int etc)
 #				Improved the way config info of the alias_module is found (now dependant on external function instead of external variable)
 #				Removed unused includes
+# Rev. 1.1.04:	Bugfix: wrong x-ajp-pathinfo header was sent, resulting in wrong path_info on the tomcat side
+#				Thanks a lot to Tim Bugler, for helping to resolve this problem!
 #
 # usage:		Add the following lines to Apache's httpd.conf
 #
@@ -361,7 +363,7 @@ static int modcfml_handler(request_rec *r)
 	if (strstr(ext, slash))
 	{
 		// set the path_info header for Lucee/Railo/OBD
-		apr_table_set(r->headers_in, "xajp-path-info", strrchr(ext, '/') );
+		apr_table_set(r->headers_in, "xajp-path-info", strstr(ext, slash) );
 
 		// Awesome awesome stuff (for C n00bs like me at least):
 		// ext is a pointer to a part of the char array of r->uri
