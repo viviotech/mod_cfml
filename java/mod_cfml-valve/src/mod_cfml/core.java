@@ -241,7 +241,7 @@ public class core extends ValveBase implements Serializable {
 		boolean addAsAlias = (!tcMainHost.equals(tcHost)) && (engine.findChild(tcMainHost) != null);
 
 // BEGIN Throttling
-		String[] contextRecord = new String[3];
+		String[] contextRecord = null;
 		if (!addAsAlias) {
 			Date newNow = new Date();
 			// try pulling up the contextRecord (if it exists yet)
