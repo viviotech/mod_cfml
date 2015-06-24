@@ -10,7 +10,9 @@ package mod_cfml;
  * Home Page:
  * http://www.modcfml.org/
  * 
- * Version:
+ * Version:  !!!!**** Update Version number in
+ * 					  'private String versionNumber'
+ * 					  as well *****!!!!!
  * 1.1.01
  * 1.1.03: June 22, 2015, Paul Klinkenberg
  * 1.1.04: June 24, 2015, Paul Klinkenberg
@@ -46,8 +48,9 @@ import org.apache.catalina.LifecycleException;
 
 public class core extends ValveBase implements Serializable {
 
-	private String[] contextRecord;
-	// declare standard vars
+
+	private String versionNumber = "1.1.04";
+
 
 	// declare configurable param defaults
 	private boolean loggingEnabled = false;
@@ -56,6 +59,8 @@ public class core extends ValveBase implements Serializable {
 	private int maxContexts = 200;
 	private boolean scanClassPaths = false;
 	private String sharedKey = "";
+	public String dataFilePath = System.getProperty(Globals.CATALINA_BASE_PROP) + "mod_cfml.dat";
+
 
 	// methods for configurable params
 	public boolean getLoggingEnabled() {
@@ -112,8 +117,10 @@ public class core extends ValveBase implements Serializable {
 		super.initInternal();
 		initInternalCalled = true;
 
+		System.out.println("[mod_cfml] Starting mod_cfml version: " + versionNumber);
+
 		/* reset the counters; we've rebooted */
-		File fi = new File("mod_cfml.dat");
+		File fi = new File(dataFilePath);
 		fi.delete();
 	}
 
@@ -125,7 +132,7 @@ public class core extends ValveBase implements Serializable {
 
 		if (initInternalCalled) {
 			if (loggingEnabled) {
-				System.out.println("[mod_cfml] initInternal was called: system rebooted? Counters have been reset.");
+				System.out.println("[mod_cfml] Counters have been reset (maxContexts, timeBetweenContexts)");
 			}
 			initInternalCalled = false;
 		}
@@ -234,89 +241,90 @@ public class core extends ValveBase implements Serializable {
 		boolean addAsAlias = (!tcMainHost.equals(tcHost)) && (engine.findChild(tcMainHost) != null);
 
 // BEGIN Throttling
-		Date newNow = new Date();
+		String[] contextRecord = new String[3];
+		if (!addAsAlias) {
+			Date newNow = new Date();
+			// try pulling up the contextRecord (if it exists yet)
+			try {
+				File fi = new File(dataFilePath);
+				if (fi.exists()) {
+					FileInputStream fis = new FileInputStream(fi);
+					ObjectInputStream is = new ObjectInputStream(fis);
 
-		// try pulling up the contextRecord (if it exists yet)
-		try {
-			File fi = new File("mod_cfml.dat");
-			if (fi.exists()) {
-				FileInputStream fis = new FileInputStream(fi);
-				ObjectInputStream is = new ObjectInputStream(fis);
-
-				// load the array into active memory
-				contextRecord = (String[]) is.readObject();
-				fis.close();
-				is.close();
-				// log it
+					// load the array into active memory
+					contextRecord = (String[]) is.readObject();
+					fis.close();
+					is.close();
+					// log it
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml] lastContext = " + contextRecord[0]);
+						System.out.println("[mod_cfml] throttleValue = " + contextRecord[2]);
+					}
+				}
+			} catch (Exception ex) {
 				if (loggingEnabled) {
+					System.out.println("[mod_cfml] Serialization Read Exception: " + ex.toString());
+				}
+			}
+
+			if ((contextRecord == null) || contextRecord.length == 0) {
+				// first run, create new array with default values
+				contextRecord = new String[3];
+
+				// contextRecord array key:
+				// 0 = lastContext - stores time last context was made (millisecond value)
+				// not in use anymore: 1 = throttleDate - stores day this record is for (days in year value)
+				// 2 = throttleValue - stores number of contexts created so far during this day
+
+				contextRecord[0] = null;
+
+				// Set the value of throttleDate to today
+				// SimpleDateFormat dayInYear = new SimpleDateFormat ("D");
+				contextRecord[1] = "0";// not in use anymore: dayInYear.format(newNow);
+
+				// Set the value of throttleValue to 0
+				contextRecord[2] = "0";
+
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml] New contextRecord Array initialized...");
 					System.out.println("[mod_cfml] lastContext = " + contextRecord[0]);
 					System.out.println("[mod_cfml] throttleValue = " + contextRecord[2]);
 				}
 			}
-		} catch (Exception ex) {
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Serialization Read Exception: " + ex.toString());
+
+			// verify timeBetweenContexts
+			if (!addAsAlias && contextRecord[0] != null) {
+				// if it's not null, ensure we've waited our timeBetweenContexts
+				if ((Long.parseLong(contextRecord[0]) + timeBetweenContexts) > newNow.getTime()) {
+					// if enough time hasn't passed yet, send a "wait" response
+					handleError(503, "Time Between Contexts has not been fulfilled. Please wait a few moments and try again.", response);
+					return;
+				}
 			}
-		}
 
-		if ((contextRecord == null) || contextRecord.length == 0) {
-			// first run, create new array with default values
-			contextRecord = new String[3];
-
-			// contextRecord array key:
-			// 0 = lastContext - stores time last context was made (millisecond value)
-			// not in use anymore: 1 = throttleDate - stores day this record is for (days in year value)
-			// 2 = throttleValue - stores number of contexts created so far during this day
-
-			contextRecord[0] = null;
-
-			// Set the value of throttleDate to today
-			// SimpleDateFormat dayInYear = new SimpleDateFormat ("D");
-			contextRecord[1] = "0";// not in use anymore: dayInYear.format(newNow);
-
-			// Set the value of throttleValue to 0
-			contextRecord[2] = "0";
-
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] New contextRecord Array initialized...");
-				System.out.println("[mod_cfml] lastContext = " + contextRecord[0]);
-				System.out.println("[mod_cfml] throttleValue = " + contextRecord[2]);
-			}
-		}
-
-		// verify timeBetweenContexts
-		if (!addAsAlias && contextRecord[0] != null) {
-			// if it's not null, ensure we've waited our timeBetweenContexts
-			if ((Long.parseLong(contextRecord[0]) + timeBetweenContexts) > newNow.getTime()) {
-				// if enough time hasn't passed yet, send a "wait" response
-				handleError(503, "Time Between Contexts has not been fulfilled. Please wait a few moments and try again.", response);
+			// verify maxContexts
+			if (!addAsAlias && Integer.parseInt(contextRecord[2]) >= maxContexts) {
+				// if maxContexts reached, refuse the request for today
+				handleError(503, "MaxContexts limit reached. No more contexts can be created!", response);
 				return;
 			}
-		}
 
-		// verify maxContexts
-		if (!addAsAlias && Integer.parseInt(contextRecord[2]) >= maxContexts) {
-			// if maxContexts reached, refuse the request for today
-			handleError(503, "MaxContexts limit reached. No more contexts can be created!", response);
-			return;
-		}
-
-// save the current time to file, so a next request can do a check for the timeBetweenContexts 
-		// set the lastContext value to now
-		if (!addAsAlias || contextRecord[0] == null) {
-			contextRecord[0] = String.valueOf(newNow.getTime());
-		}
-		// serialize and save values
-		try {
-			ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream("mod_cfml.dat"));
-			os.writeObject(contextRecord);
-			os.close();
-		} catch (Exception ex) {
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] NOTICE: Serialization Write Exception: " + ex.toString());
+			// save the current time to file, so a next request can do a check for the timeBetweenContexts
+			// set the lastContext value to now
+			if (!addAsAlias || contextRecord[0] == null) {
+				contextRecord[0] = String.valueOf(newNow.getTime());
+			}
+			// serialize and save values
+			try {
+				ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(dataFilePath));
+				os.writeObject(contextRecord);
+				os.close();
+			} catch (Exception ex) {
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml] NOTICE: Serialization Write Exception: " + ex.toString());
+				}
 			}
 		}
-
 // END Throttling
 
 // everything checks out, create the new host / add the alias
@@ -479,27 +487,26 @@ public class core extends ValveBase implements Serializable {
 		}
 
 // STEP 6 - record the times and serialize our data
+		if (!addAsAlias && contextRecord != null) {
+			// contextRecord array key:
+			// 0 = lastContext - stores time last context was made (millisecond value)
+			// 1 = throttleDate - stores day this record is for (days in year value)
+			// 2 = throttleValue - stores number of contexts created so far during this day
 
-		// contextRecord array key:
-		// 0 = lastContext - stores time last context was made (millisecond value)
-		// 1 = throttleDate - stores day this record is for (days in year value)
-		// 2 = throttleValue - stores number of contexts created so far during this day
-
-		// add 1 to our throttleValue, if we added a new Host
-		if (addAsAlias == false) {
+			// add 1 to our throttleValue, if we added a new Host
 			int numContexts = Integer.parseInt(contextRecord[2]);
 			numContexts++;
 			contextRecord[2] = Integer.toString(numContexts);
-		}
 
-		// serialize and save values
-		try {
-			ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream("mod_cfml.dat"));
-			os.writeObject(contextRecord);
-			os.close();
-		} catch (Exception ex) {
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] NOTICE: Serialization Write Exception: " + ex.toString());
+			// serialize and save values
+			try {
+				ObjectOutputStream os = new ObjectOutputStream(new FileOutputStream(dataFilePath));
+				os.writeObject(contextRecord);
+				os.close();
+			} catch (Exception ex) {
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml] NOTICE: Serialization Write Exception: " + ex.toString());
+				}
 			}
 		}
 
@@ -516,7 +523,7 @@ public class core extends ValveBase implements Serializable {
 			System.out.println("[mod_cfml] Redirect URL => '" + tcRedirectURL + "'");
 		}
 
-		response.sendRedirect(tcRedirectURL);
+		response.sendRedirect(response.encodeRedirectUrl(tcRedirectURL));
 	}
 
 
