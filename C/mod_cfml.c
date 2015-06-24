@@ -1,6 +1,6 @@
 ﻿/* ##############################################################################
 # package:		mod_cfml.c
-# version:		1.1.03
+# version:		1.1.04
 # author:		Paul Klinkenberg (paul@lucee.nl)
 # website:		http://www.modcfml.org/  ||  http://www.lucee.nl/
 # license:		LGPL 3.0; see http://www.opensource.org/licenses/lgpl-3.0.html
@@ -10,8 +10,8 @@
 #				Updated code to be more compatible with old Windows C89 (boolean to int etc)
 #				Improved the way config info of the alias_module is found (now dependant on external function instead of external variable)
 #				Removed unused includes
-# Rev. 1.1.04:	Bugfix: wrong x-ajp-pathinfo header was sent, resulting in wrong path_info on the tomcat side
-#				Thanks a lot to Tim Bugler, for helping to resolve this problem!
+# Rev. 1.1.04:	Bugfix: wrong x-ajp-path-info header was sent, resulting in wrong path_info on the tomcat side
+#				Thanks a lot to Tim Bugler, for helping debugging the 1.1 version!
 #
 # usage:		Add the following lines to Apache's httpd.conf
 #
@@ -23,6 +23,7 @@
 	# LogHandlers true
 	# LogAliases  true
 	# VDirHeader  false
+	# AJPPathInfoHeader  false
 #
 ############################################################################## */
 /* Include the required headers from httpd */
@@ -97,6 +98,7 @@ typedef struct {
 	int LogHandlers;
 	int LogAliases;
 	int VDirHeader;
+	int AJPPathInfoHeader;
 	const char *SharedKey;
 } modcfml_config;
 
@@ -149,6 +151,13 @@ const char *modcfml_set_vdirheader(cmd_parms *cmd, void *cfg, const char *arg)
 	return NULL;
 }
 
+/* Handler for the "AJPPathInfoHeader" directive */
+const char *modcfml_set_AJPPathInfoHeader(cmd_parms *cmd, void *cfg, const char *arg)
+{
+    config.AJPPathInfoHeader = strcasecmp(arg, "true") == 0 ? 1:0;
+	return NULL;
+}
+
 
 /* Handler for the "CFMLHandlers" directive */
 const char *modcfml_set_cfmlhandlers(cmd_parms *cmd, void *cfg, const char *arg)
@@ -181,6 +190,8 @@ static const command_rec modcfml_directives[] =
                   "Logging of the available Aliases true/false"),
 	AP_INIT_TAKE1("VDirHeader", modcfml_set_vdirheader, NULL, RSRC_CONF,
                   "Add request header x-vdirs with aliases info true/false"),
+	AP_INIT_TAKE1("AJPPathInfoHeader", modcfml_set_AJPPathInfoHeader, NULL, RSRC_CONF,
+                  "Add request header x-ajp-path-info if path_info is available true/false"),
 	AP_INIT_TAKE1("LogHeaders", modcfml_set_logheaders, NULL, RSRC_CONF,
                   "Logging of the incoming headers true/false"),
     {NULL}
@@ -205,6 +216,7 @@ static void register_hooks(apr_pool_t *pool)
 {
 	config.CFMLHandlers = ".cfm .cfc .cfml";
 	config.VDirHeader = 1;
+	config.AJPPathInfoHeader = 1;
 	/* Make sure this handler is called before mod_proxy / mod_jk is called,
 	   by setting hook order to APR_HOOK_FIRST - 1 */
 	ap_hook_handler(modcfml_handler, NULL, NULL, APR_HOOK_FIRST - 1);
@@ -362,8 +374,10 @@ static int modcfml_handler(request_rec *r)
 	// does the extension contain path_info at the end?
 	if (strstr(ext, slash))
 	{
-		// set the path_info header for Lucee/Railo/OBD
-		apr_table_set(r->headers_in, "xajp-path-info", strstr(ext, slash) );
+		if (config.AJPPathInfoHeader == 1) {
+			// set the path_info header for Lucee/Railo/OBD
+			apr_table_set(r->headers_in, "xajp-path-info", strstr(ext, slash) );
+		}
 
 		// Awesome awesome stuff (for C n00bs like me at least):
 		// ext is a pointer to a part of the char array of r->uri
