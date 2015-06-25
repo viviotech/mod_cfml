@@ -59,7 +59,7 @@ public class core extends ValveBase implements Serializable {
 	private int maxContexts = 200;
 	private boolean scanClassPaths = false;
 	private String sharedKey = "";
-	public String dataFilePath = System.getProperty(Globals.CATALINA_BASE_PROP) + "mod_cfml.dat";
+	public String dataFilePath = System.getProperty(Globals.CATALINA_BASE_PROP) + "/mod_cfml.dat";
 
 
 	// methods for configurable params
