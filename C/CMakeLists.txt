@@ -4,8 +4,9 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
 SET(modnames cfml)
 
-INCLUDE_DIRECTORIES(${CMAKE_INSTALL_PREFIX}/include)
-
+INCLUDE_DIRECTORIES("${CMAKE_INSTALL_PREFIX}/lib"
+	"${CMAKE_INSTALL_PREFIX}/include"
+)
 FOREACH(shortname ${modnames})
    SET(modbase "mod_${shortname}")
    SET(modbasename "${modbase}.c")
