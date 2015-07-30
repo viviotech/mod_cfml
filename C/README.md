@@ -1,5 +1,7 @@
 #Compiling mod_cfml.so
 
+If you can't find a pre-compiled version of mod_cfml.so [here](builds/), please follow the instructions underneath.
+
 ##Compile for Mac and Linux
 
 1. Get the source code from github: https://github.com/utdream/mod_cfml/archive/master.zip
@@ -18,7 +20,7 @@
 
 ###Prerequisites
 
-1.  Install Visual Studio
+1.  Install Visual Studio. Make sure the Visual Studio version matches the version with which your Apache version is compiled. This is the "VC14" or "VC11" part. 
 2. Download Apache 2.4
  - for Win32 into C:/Apache_x86 : https://www.apachelounge.com/download/
  - for Win64 into C:/Apache_x64 : https://www.apachelounge.com/download/
