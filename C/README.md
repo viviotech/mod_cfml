@@ -1,6 +1,13 @@
 #Compiling mod_cfml.so
 
-If you can't find a pre-compiled version of mod_cfml.so [here](builds/), please follow the instructions underneath.
+There are quite a few compiled versions of mod_cfml.so:
+
+- Windows: see the [builds directory](builds/)
+- Ubuntu: see the [mod_cfml installers](https://github.com/utdream/CFML-Installers/tree/master/lucee/linux/sys/mod_cfml)
+- CentOS: see the [mod_cfml installers](https://github.com/utdream/CFML-Installers/tree/master/lucee/linux/sys/mod_cfml)
+- Mac OSX 10.10 (maybe others as well): see the [builds directory](builds/)
+
+If you can't find a pre-compiled version at those locations, please follow the instructions underneath.
 
 ##Compile for Mac and Linux
 
@@ -20,7 +27,10 @@ If you can't find a pre-compiled version of mod_cfml.so [here](builds/), please 
 
 ###Prerequisites
 
-1.  Install Visual Studio. Make sure the Visual Studio version matches the version with which your Apache version is compiled. This is the "VC14" or "VC11" part. 
+1.  Install Visual Studio.
+    *Make sure the Visual Studio version matches the version with which your Apache version is compiled.*
+     You can check the Visual Studio version by opening a Command prompt (cmd.exe), CD to the Apache bin directory, and then type `httpd -v`.
+     The output should contain "VC14", "VC11", or another version. VC14=Visual Studio 2015, VC11=Visual Studio 2012, etc.
 2. Download Apache 2.4
  - for Win32 into C:/Apache_x86 : https://www.apachelounge.com/download/
  - for Win64 into C:/Apache_x64 : https://www.apachelounge.com/download/
