@@ -16,6 +16,7 @@ package mod_cfml;
  * 1.1.01
  * 1.1.03: June 22, 2015, Paul Klinkenberg
  * 1.1.04: June 24, 2015, Paul Klinkenberg
+ * 1.1.05: August 28, 2015, Paul Klinkenberg
  */
 
 // java
@@ -29,6 +30,8 @@ import java.io.FileInputStream;
 import java.io.ObjectInputStream;
 import java.lang.String;
 import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 // import java.text.SimpleDateFormat;
 
 // servlet
@@ -49,7 +52,7 @@ import org.apache.catalina.LifecycleException;
 public class core extends ValveBase implements Serializable {
 
 
-	private String versionNumber = "1.1.04";
+	private String versionNumber = "1.1.05";
 
 
 	// declare configurable param defaults
@@ -191,7 +194,16 @@ public class core extends ValveBase implements Serializable {
 			return;
 		}
 
-		// Gete the URI so we can pass it to ourselves again if needed
+		// if X-Webserver-Context is given, it might contain characters not allowed by Tomcat
+		// to be used as the VirtualHost HostName (eg. spaces, semi-colons, colons, slashes)
+		Pattern UNSAFE_CHARS = Pattern.compile("[^a-z0-9\\._-]");
+		Matcher matcher = UNSAFE_CHARS.matcher(tcMainHost);
+		while (matcher.find()) {
+			String unsafeChar = matcher.group();
+			tcMainHost = tcMainHost.replace(unsafeChar, "-chr" + ((int)unsafeChar.charAt(0)) + "-");
+		}
+
+		// Get the URI so we can pass it to ourselves again if needed
 		String tcURI = request.getDecodedRequestURI();
 		String tcURIParams = request.getQueryString();
 
