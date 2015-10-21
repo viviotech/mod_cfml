@@ -1,6 +1,6 @@
 ﻿/* ##############################################################################
 # package:		mod_cfml.c
-# version:		1.1.04
+# version:		1.1.06
 # author:		Paul Klinkenberg (paul@lucee.nl)
 # website:		http://www.modcfml.org/  ||  http://www.lucee.nl/
 # license:		LGPL 3.0; see http://www.opensource.org/licenses/lgpl-3.0.html
@@ -12,6 +12,9 @@
 #				Removed unused includes
 # Rev. 1.1.04:	Bugfix: wrong x-ajp-path-info header was sent, resulting in wrong path_info on the tomcat side
 #				Thanks a lot to Tim Bugler, for helping debugging the 1.1 version!
+# Rev. 1.1.06:	Changed native C to APR functions, for more reliable memory management:
+#				apr_palloc instead of malloc / apr_pstrcat / apr_pstrdup / apr_psprintf;
+#				Updated some optional debug output ("Incoming header" => "Request header", Alias output list starts with 1 instead of 0)
 #
 # usage:		Add the following lines to Apache's httpd.conf
 #
@@ -39,7 +42,6 @@
 
 /* ###################### basename function, for windows ##################### */
 #if defined _WIN32 || defined __WIN32__ || defined __EMX__ || defined __DJGPP__
-#include <malloc.h>
 	/* Win32, OS/2, DOS */
 	# define HAS_DEVICE(P) \
 	((((P)[0] >= 'A' && (P)[0] <= 'Z') || ((P)[0] >= 'a' && (P)[0] <= 'z')) \
@@ -226,11 +228,11 @@ static int print_header(void* rec, const char* key, const char* value)
 {
 	request_rec* r = (request_rec *)rec;
 	ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server,
-		"Incoming header [%s] => %s", key, value);
+		"Request header [%s] => %s", key, value);
 	return 1;
 }
 
-static char *copy_without_trailing_slash(const char* source)
+static char *copy_without_trailing_slash(const char* source, apr_pool_t *pool)
 {
 	void* tmpptr;
 	char* dest;
@@ -240,10 +242,7 @@ static char *copy_without_trailing_slash(const char* source)
 		pathlen = pathlen - 1;
 	}
 
-	tmpptr = malloc( pathlen + 1 );
-	if (tmpptr==NULL) {
-		return NULL;
-	}
+	tmpptr = apr_palloc(pool, (size_t)(pathlen + 1));
 
 	dest = (char*) tmpptr;
 	if (dest != NULL)
@@ -255,7 +254,7 @@ static char *copy_without_trailing_slash(const char* source)
 }
 
 
-static int add_alias_header(request_rec* r)
+static int add_alias_header(request_rec* r, apr_pool_t *pool)
 {
 	ap_conf_vector_t *sconf;
 	void *tmpConf;
@@ -263,7 +262,6 @@ static int add_alias_header(request_rec* r)
 	apr_array_header_t *aliases;
 	alias_entry *entries;
 	char * header_string = "";
-	char * temp_str;
 	char * fake = 0;
 	char * real = 0;
 	int i;
@@ -305,32 +303,23 @@ static int add_alias_header(request_rec* r)
 		if (alias->regexp) {
 			if (config.LogAliases==1) {
 				ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server,
-					"%d. RegEx alias, not usable by mod_cfml: [%s] -> [%s]", i, alias->fake, alias->real);
+					"%d. RegEx alias, not usable by mod_cfml: [%s] -> [%s]", i+1, alias->fake, alias->real);
 			}
 		}
 		else {
 			if (config.LogAliases==1) {
 				ap_log_error(APLOG_MARK, APLOG_NOTICE, 0, r->server,
-					"%d. Alias: [%s] -> [%s]", i, alias->fake, alias->real);
+					"%d. Alias: [%s] -> [%s]", i+1, alias->fake, alias->real);
 			}
 			
 			/* remove trailing slash, if any */
-			fake = copy_without_trailing_slash(alias->fake);
-			real = copy_without_trailing_slash(alias->real);
-			temp_str = header_string;
-			
-			if(fake != NULL && real != NULL && (header_string = (char *)malloc(strlen(temp_str)+strlen(fake)+strlen(real)+3)) != NULL)
-			{
-				header_string[0] = '\0';// ensures the memory is an empty string
-				strcat(header_string, temp_str);
-				strcat(header_string, fake);
-				strcat(header_string, ",");
-				strcat(header_string, real);
-				strcat(header_string, ";");
-			} else {
-				// fprintf(STDERR,"malloc failed!\n");
+			fake = copy_without_trailing_slash(alias->fake, pool);
+			real = copy_without_trailing_slash(alias->real, pool);
+
+			if(fake == NULL || real == NULL) {
 				return 1;
 			}
+			header_string = apr_pstrcat(pool, header_string, fake, ",", real, ";", NULL);
 		}
 	}
 
@@ -348,11 +337,11 @@ static int modcfml_handler(request_rec *r)
 	const char delim[2] = " ";
 	int found = 0;
 	char *server_hostname;
-	char *config_filepath;
 	char *config_filename;
-	char line_number[10];
+	char *line_number;
 	char *unique_vhost_id;
-    int i = 0;
+    size_t i = 0;
+    apr_pool_t *pool = r->pool;
 
 	// security: check if there already is a DocRoot header coming in,
 	// and if so, remove the header
@@ -379,7 +368,7 @@ static int modcfml_handler(request_rec *r)
 			apr_table_set(r->headers_in, "xajp-path-info", strstr(ext, slash) );
 		}
 
-		// Awesome awesome stuff (for C n00bs like me at least):
+		// Awesome awesome stuff:
 		// ext is a pointer to a part of the char array of r->uri
 		// strtok sets a \0 at the position where it finds a slash (start of path_info)
 		// By doing this, we:
@@ -395,7 +384,7 @@ static int modcfml_handler(request_rec *r)
 	}
 
 	// we will do another substring check, but now while looping through the actual extensions
-	handlers = (char *)malloc( (size_t)((strlen(config.CFMLHandlers) + 1) * sizeof(char)) );
+	handlers = (char *)apr_palloc(pool, (size_t)(strlen(config.CFMLHandlers) + 1) );
 	memset(handlers, '\0', strlen(handlers));
 	strcpy(handlers, config.CFMLHandlers);
 	
@@ -415,7 +404,6 @@ static int modcfml_handler(request_rec *r)
 		}
 		handler = strtok(NULL, delim);
 	}
-	free(handlers);
 
 	// if file extension is not to be handled by us
 	if (found==0) {
@@ -424,15 +412,21 @@ static int modcfml_handler(request_rec *r)
 
 
 	// create unique name for this VirtualHost context
-	server_hostname = strdup( r->server->server_hostname );
-	config_filepath = r->server->defn_name == NULL ? NULL : strdup( r->server->defn_name );
-
-	config_filename = config_filepath == NULL ? "server-conf" : getbasename(config_filepath);
-	if (config_filename == NULL) {
+	server_hostname = apr_pstrdup(pool, r->server->server_hostname );
+	if (server_hostname == NULL) {
+		server_hostname = "nohostname";
+	}
+	if (r->server->defn_name != NULL) {
+		config_filename = getbasename( apr_pstrdup(pool, r->server->defn_name ) );
+		if (config_filename == NULL || strlen(config_filename) == 0) {
+			config_filename = "server-conf";
+		}
+	} else {
 		config_filename = "server-conf";
 	}
-	sprintf(line_number, "l%d", r->server->defn_line_number);
-	unique_vhost_id = apr_pstrcat(r->pool, server_hostname, "-", config_filename, line_number, NULL);
+
+	line_number = apr_psprintf(pool, "l%d", r->server->defn_line_number);
+	unique_vhost_id = apr_pstrcat(pool, server_hostname, "-", config_filename, line_number, NULL);
     // remove any special characters from the unique_vhost_id, especially colons (:) which are used in IPV6
     for(; i < strlen(unique_vhost_id); i++)
     {
@@ -452,18 +446,13 @@ static int modcfml_handler(request_rec *r)
 	apr_table_set(r->headers_in, "X-Tomcat-DocRoot", ap_document_root(r));
 	apr_table_set(r->headers_in, "X-Webserver-Context", unique_vhost_id);
 
-    if (server_hostname != NULL)
-    	free(server_hostname);
-    if (config_filepath != NULL)
-    	free(config_filepath);
-
 	if (config.SharedKey != NULL) {
 		apr_table_set(r->headers_in, "X-ModCFML-SharedKey", config.SharedKey);
 	}
 
 	// new: add a header X-VDirs, which contains all known aliases for the VHost
 	if (config.VDirHeader == 1) {
-		add_alias_header(r);
+		add_alias_header(r, pool);
 	}
 
 	if (config.LogHeaders == 1) {
