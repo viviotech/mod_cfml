@@ -1,6 +1,6 @@
 ﻿/* ##############################################################################
 # package:		mod_cfml.c
-# version:		1.1.06
+# version:		1.1.07
 # author:		Paul Klinkenberg (paul@lucee.nl)
 # website:		http://www.modcfml.org/  ||  http://www.lucee.nl/
 # license:		LGPL 3.0; see http://www.opensource.org/licenses/lgpl-3.0.html
@@ -15,6 +15,10 @@
 # Rev. 1.1.06:	Changed native C to APR functions, for more reliable memory management:
 #				apr_palloc instead of malloc / apr_pstrcat / apr_pstrdup / apr_psprintf;
 #				Updated some optional debug output ("Incoming header" => "Request header", Alias output list starts with 1 instead of 0)
+# Rev. 1.1.07:	(Nov. 14, 2015) Added a version notice when this module starts up.
+#				note: Love to all French citizens who suffered in the terrorist attack yesterday. Unreal.
+#
+#				*** Don't forget to update the version nr. at modcfml_init_handler() when the Rev. nr. is updated! ***
 #
 # usage:		Add the following lines to Apache's httpd.conf
 #
@@ -87,6 +91,7 @@ char *getbasename(char const *name)
 /* Define prototypes of our functions in this module */
 static void register_hooks(apr_pool_t *pool);
 static int modcfml_handler(request_rec *r);
+static int modcfml_init_handler(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s);
 
 
 /*
@@ -222,6 +227,26 @@ static void register_hooks(apr_pool_t *pool)
 	/* Make sure this handler is called before mod_proxy / mod_jk is called,
 	   by setting hook order to APR_HOOK_FIRST - 1 */
 	ap_hook_handler(modcfml_handler, NULL, NULL, APR_HOOK_FIRST - 1);
+	ap_hook_post_config(modcfml_init_handler, NULL, NULL, APR_HOOK_MIDDLE);
+}
+
+/**
+ * Module initialization
+ */
+static int modcfml_init_handler(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *ptemp, server_rec *s) {
+	void *data = NULL;
+	const char *key = "modcfml_thanks_config";
+
+	// This code is used to prevent double initialization of the module during Apache startup
+	apr_pool_userdata_get(&data, key, s->process->pool);
+	if ( data == NULL ) {
+		apr_pool_userdata_set((const void *)1, key, apr_pool_cleanup_null, s->process->pool);
+		return OK;
+	}
+
+	ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
+		"Thanks for using ModCFML, version 1.1.07");
+    return OK;
 }
 
 static int print_header(void* rec, const char* key, const char* value)
