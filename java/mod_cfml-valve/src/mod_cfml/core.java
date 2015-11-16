@@ -24,16 +24,10 @@ package mod_cfml;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.Serializable;
 import java.io.FileOutputStream;
-import java.io.ObjectOutputStream;
-import java.io.FileInputStream;
-import java.io.ObjectInputStream;
-import java.lang.String;
 import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-// import java.text.SimpleDateFormat;
 
 // servlet
 import javax.servlet.ServletException;
@@ -50,11 +44,9 @@ import org.apache.catalina.connector.Response;
 import org.apache.catalina.startup.HostConfig;
 import org.apache.catalina.LifecycleException;
 
-public class core extends ValveBase implements Serializable {
+public class core extends ValveBase {
 
-
-	private String versionNumber = "1.1.06";
-
+	private final String versionNumber = "1.1.06";
 
 	// declare configurable param defaults
 	private boolean loggingEnabled = false;
@@ -64,15 +56,10 @@ public class core extends ValveBase implements Serializable {
 	private boolean scanClassPaths = false;
 	private String sharedKey = "";
 
-	private static long lastContextTime;
-	private static int throttleValue;
-	private static Object lock;
-	synchronized {
-		lock = new Object();
-		lastContextTime = null;
-		throttleValue = 0;
-	}
-	
+	// you must take the lock for these
+	private static long lastContextTime = 0L;
+	private static int throttleValue = 0;
+	private static final Object lock = new Object();	
 
 	// methods for configurable params
 	public boolean getLoggingEnabled() {
@@ -123,15 +110,11 @@ public class core extends ValveBase implements Serializable {
 		this.sharedKey = sharedKey;
 	}
 
-	public boolean initInternalCalled = false;
-
+	@Override
 	protected void initInternal() throws LifecycleException {
 		super.initInternal();
-		initInternalCalled = true;
 
 		System.out.println("[mod_cfml] Starting mod_cfml version: " + versionNumber);
-
-		
 	}
 
 	@Override
@@ -139,13 +122,6 @@ public class core extends ValveBase implements Serializable {
 		String tcDocRoot;
 		String tcHost;
 		String tcMainHost;
-
-		if (initInternalCalled) {
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Counters have been reset (maxContexts, timeBetweenContexts)");
-			}
-			initInternalCalled = false;
-		}
 
 		// Get the DocRoot value from the HTTP header
 		tcDocRoot = request.getHeader("X-Tomcat-DocRoot");
@@ -266,9 +242,9 @@ public class core extends ValveBase implements Serializable {
 			String errorMessage = null;
 			// verify timeBetweenContexts
 			synchronized(lock) {
-				if (lastContextTime != null) {
-					// if it's not null, ensure we've waited our timeBetweenContexts
-					if (lastContextTime + timeBetweenContexts) > newNow.getTime()) {
+				if (lastContextTime != 0L) {
+					// if it's not initialized, ensure we've waited our timeBetweenContexts
+					if ((lastContextTime + timeBetweenContexts) > newNow.getTime()) {
 						// if enough time hasn't passed yet, send a "wait" response
 						errorMessage = "Time Between Contexts has not been fulfilled. Please wait a few moments and try again.";
 					}
@@ -318,9 +294,8 @@ public class core extends ValveBase implements Serializable {
 // STEP 2 - Check/Create the XML config and work directories
 		// set the config directory value
 		String newHostConfDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/conf/Catalina/" + tcMainHost;
-		File newHostConfDirFile = null;
 		file = new File(newHostConfDir);
-		newHostConfDirFile = file.getCanonicalFile();
+		File newHostConfDirFile = file.getCanonicalFile();
 
 		// see if the directory exists already
 		if (!newHostConfDirFile.isDirectory()) {
@@ -346,9 +321,8 @@ public class core extends ValveBase implements Serializable {
 		// set the work directory value
 		String newHostWorkDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/work/Catalina/" + tcMainHost;
 
-		File newHostWorkDirFile = null;
 		file = new File(newHostWorkDir);
-		newHostWorkDirFile = file.getCanonicalFile();
+		File newHostWorkDirFile = file.getCanonicalFile();
 
 		// see if the directory exists already
 		if (!newHostWorkDirFile.isDirectory()) {
@@ -417,13 +391,11 @@ public class core extends ValveBase implements Serializable {
 		if (loggingEnabled) {
 			System.out.println("[mod_cfml] Verifying context files...");
 		}
-		boolean _found = false;
-		File tcContextXMLFile = null;
-		File tcContextXMLFilePointer = null;
-
-		tcContextXMLFilePointer = new File(newHostConfFile);
-		tcContextXMLFile = tcContextXMLFilePointer.getCanonicalFile();
+		
+		File tcContextXMLFilePointer = new File(newHostConfFile);
+		File tcContextXMLFile = tcContextXMLFilePointer.getCanonicalFile();
 		// wait for the specified number of seconds
+		boolean _found = false;
 		for (int i = 0; i <= waitForContext; i++) {
 			// check to see if the directory exists
 			if (newHostConfDirFile.isDirectory()) {
@@ -437,29 +409,26 @@ public class core extends ValveBase implements Serializable {
 					}
 				}
 			}
-			if (waitForContext > i) {
-				if (loggingEnabled) {
-					System.out.println("[mod_cfml] Context files do not yet exist! Will check again after 1 second... (" + (i + 1) + ")");
-				}
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-				}
-			} else {
-				if (loggingEnabled) {
-					System.out.println("[mod_cfml] ERROR: Context files do not exist! Will continue, but likely to result in error.");
-				}
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] Context files do not yet exist! Will check again after 1 second... (" + (i + 1) + ")");
+			}
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+			}
+		}
+		if (!_found) {
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] ERROR: Context files do not exist! Will continue, but likely to result in error.");
 			}
 		}
 
 // STEP 6 - record the times and serialize our data
 		if (!addAsAlias) {
 			// add 1 to our throttleValue, if we added a new Host
-			int numContexts = Integer.parseInt(contextRecord[2]);
-			numContexts++;
 			synchronized(lock) {
-				throttleValue = numContexts;	
-			}			
+				throttleValue++;
+			}
 		}
 
 // STEP 7 - call ourselves again so we bypass localhost
@@ -475,7 +444,7 @@ public class core extends ValveBase implements Serializable {
 			System.out.println("[mod_cfml] Redirect URL => '" + tcRedirectURL + "'");
 		}
 
-		response.sendRedirect(response.encodeRedirectUrl(tcRedirectURL));
+		response.sendRedirect(response.encodeRedirectURL(tcRedirectURL));
 	}
 
 
@@ -484,8 +453,8 @@ public class core extends ValveBase implements Serializable {
 	public static boolean deleteDir(File dir) {
 		if (dir.isDirectory()) {
 			String[] children = dir.list();
-			for (int i = 0; i < children.length; i++) {
-				boolean success = deleteDir(new File(dir, children[i]));
+			for (String child : children) {
+				boolean success = deleteDir(new File(dir, child));
 				if (!success) {
 					return false;
 				}
@@ -529,5 +498,4 @@ public class core extends ValveBase implements Serializable {
 
 		return newHost;
 	}
-
 }
