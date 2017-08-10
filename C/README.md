@@ -13,7 +13,12 @@ If you can't find a pre-compiled version at those locations, please follow the i
 
 1. Get the source code from github: https://github.com/utdream/mod_cfml/archive/master.zip
     and extract into eg. `~/Documents/` (_a sub-folder "mod_cfml-master" will be created_)
-2. Open a Terminal window, and enter:
+    
+2. This depends on the apache development tools, i.e. apsx
+    sudo apt-get install apache2-dev (debian/ubuntu)
+    yum install httpd24-devel (redhat etc)
+
+3. Open a Terminal window, and enter:
 
     ```
     cd ~/Documents/mod_cfml-master/C
@@ -21,7 +26,7 @@ If you can't find a pre-compiled version at those locations, please follow the i
     sudo make install
     ```
 
-3. The mod_cfml.so file can now be found in your Apache modules directory, by default at `/usr/libexec/apache2/mod_cfml.so`
+4. The mod_cfml.so file can now be found in your Apache modules directory, by default at `/usr/libexec/apache2/mod_cfml.so`
 
 ##Compile for Windows
 
