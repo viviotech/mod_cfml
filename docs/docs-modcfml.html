@@ -1,0 +1,222 @@
+<!DOCTYPE HTML>
+<!--
+	Editorial by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>mod_cfml - Documentation - mod_cfml.so</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+	</head>
+	<body>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<div id="main">
+						<div class="inner">
+
+							<!-- Header -->
+								<header id="header">
+									<a href="index.html" class="logo"><strong>mod_cfml</strong> by Vivio Technologies</a>
+									<ul class="icons">
+										<li><a href="https://github.com/viviotech" class="icon fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="https://viviotech.net/" class="icon fa-home"><span class="label">Vivio Homepage</span></a></li>
+										<li><a href="https://twitter.com/viviotech" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="https://www.facebook.com/viviotech/" class="icon fa-facebook"><span class="label">Facebook</span></a></li>
+									</ul>
+								</header>
+
+							<!-- Content -->
+								<section>
+									<header class="main">
+										<h1>Apache mod_cfml.so</h1>
+									</header>
+
+									<h2>Configuration Options</h2>
+
+									<p>The default Apache configuration of mod_cfml is as follows:</p>
+									<pre><code>LoadModule modcfml_module modules/mod_cfml.so
+CFMLHandlers ".cfm .cfc .cfml"
+ModCFML_SharedKey "secret key also set in the Tomcat valve config"
+# Optional, all for logging and debugging:
+# LogHeaders true
+# LogHandlers true
+# LogAliases true
+# VDirHeader false</code></pre>
+									<p>The following describes what these options do and how to utilize them...</p>
+
+									<dl>
+										<dt>LoadModule cfml_module modules/mod_cfml.so</dt>
+										<dd>
+											<p>This line tells Apache to load the mod_cfml module when Apache starts, so that it can be run in system memory. Mod_cfml is *very* small, and generates almost no memory-resident system footprint whatsoever.</p>
+										</dd>
+										<dt>CFMLHandlers ".cfm .cfc .cfml"</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <code>[variable]</code><br>
+												Default: <code>".cfm .cfc .cfml"</code>
+											</p>
+											<p>This variable is a space-delimited list of file extensions for mod_cfml to look for in an incoming request URI. All items need to start with the "." character.</p>
+											<p>The actual check is done on anything following the first "." (dot) in the requested filename. If the requested filename contains multiple dots, eg. "my.strange.name.cfm", then a match will be done on "strange.name.cfm", which will not match ".cfm".</p>
+											<p>Also be aware that the web directories do not contain a dot (".") in their name, as anything following the first dot will be regarded as file extension.</p>
+											<p>If the file extension is matched, then mod_cfml will add the mod_cfml headers to the incoming request. Tomcat will then use this information for a new web context (or web context host alias), in case it has not set up the web context before.</p>
+											<p>For example, you could add the value ".jsp" to this attribute, and automatically create Tomcat hosts for JSP-based sites. Strangely enough, there is nothing about mod_cfml that requires it to only be useful for CFML sites.</p>
+										</dd>
+										<dt>ModCFML_SharedKey "secret key also set in the Tomcat valve config"</dt>
+										<dd>
+											<p>This is a two-way setting: it must either be set both in Apache httpd and in Tomcat, or at none of them. The Apache side simply adds an incoming header with the shared key value. The Tomcat side checks if a secret key is set in it's config, and if so, requires any incoming request to have the shared key in it's incoming "X-ModCFML-SharedKey" header.</p>
+										</dd>
+										<dt>Logheaders false|true</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <code>true</code> or <code>false</code><br>
+												Default: <code>false</code>
+											</p>
+											<p>This variable tells mod_cfml to log the incoming request headers that it sees. The logs will contain the incoming request headers as they are after mod_cfml has done it's job. The main purpose of this logging function is to make sure mod_cfml is detecting incoming requests (load balanced instances, for example) and ensure that headers are being modifed as the request passes through mod_cfml.</p>
+											<p>Logs sent from mod_cfml are sent as "Notices" - which means they will bypass typical Apache loglevels. It is fairly important to keep these set to "false" for large sites, as setting it to "true" can put a huge strain on both processing time and IO Waits, as massive log files are written. The main purpose of the mod_cfml logging options are for debugging purposes to ensure things are working properly. The logging functions were not written for or intended for every-day use.</p>
+											<div class="box">
+												<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT: Enabling logging is not recommended for production sites.</p>
+											</div>
+										</dd>
+										<dt>LogHandlers false|true</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <code>true</code> or <code>false</code><br>
+												Default: <code>false</code>
+											</p>
+											<p>This variable tells mod_cfml to log how handlers are interpreted. First mod_cfml will log what it currently sees it's handlers as being (good for making sure you have your handlers set right), then it will log if the incoming request matches a handler value.</p>
+											<p>Again, all logs are sent to Apache as "Notices", so they bypass any Apache loglevel you may have set. Further, they are very IO and processing intensive. Logging is not recommended for every-day use.</p>
+										</dd>
+										<dt>LogAliases false|true</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <code>true</code> or <code>false</code><br>
+												Default: <code>false</code>
+											</p>
+											<p>This variable tells mod_cfml if it needs to log the directory aliases it finds. This setting only has an effect if the VDirHeader setting underneath, is set to true (the default).</p>
+											<p>As said before, all logs are sent to Apache as "Notices", so they bypass any Apache loglevel you may have set. Further, they are very IO and processing intensive. Logging is not recommended for every-day use.</p>
+										</dd>
+										<dt>VDirHeader false|true</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <code>true</code> or <code>false</code><br>
+												Default: <code>false</code>
+											</p>
+											<p>This variable tells mod_cfml if it needs to add the header X-VDirs. This header will contain a list of the directory mappings / virtual directories for the current web context.The information in this header is currently only used in Lucee, where it will recreate these mappings for the current request.</p>
+										</dd>
+									</dl>
+
+									<hr class="major" />
+
+									<h2>Frequently Asked Questions</h2>
+
+									<dl>
+										<dt>What is mod_cfml.so?</dt>
+										<dd>
+											<p>Mod_cfml.so is one of the Web Server Components that are part of the mod_cfml suite. In particular, it is the Apache module that sends the web site configuration information off to the mod_cfml Tomcat Component.</p>
+										</dd>
+										<dt>What kind of configuration information is mod_cfml.so passing to Tomcat?</dt>
+										<dd>
+											<p>Specifically, mod_cfml records the "Document Root", the "Server Name", and available mappings of the current Virtual host. If you would have a VirtualHost in Apache like the following, written in httpd.conf:</p>
+											<pre><code>&lt;VirtualHost *:80&gt;
+    ServerName  www.luceerocks.com
+    DocumentRoot  /var/www/luceerocks.com/data
+    Alias /sharedimg   /var/www/shared/images
+&lt;/VirtualHost&gt;</code></pre>
+											<p>Then the following request headers would be sent to Tomcat:</p>
+											<pre><code>X-Webserver-Context  www.luceerocks.com-httpd.confl123
+X-Tomcat-DocRoot  /var/www/luceerocks.com/data
+x-vdirs  /sharedimg,/var/www/shared/images</code></pre>
+											<p>The "x-vdirs" header is optional, and enabled by default. You can turn it off by setting "VDirHeader false" in the httpd configuration.</p>
+											<p>The X-Webserver-Context value is a combination of the ServerName, the config filename, and the line in the config file where the definition is at. This way, we can make sure this value is unique per Apache server.</p>
+										</dd>
+										<dt>Exactly how does mod_cfml get the document root and other information to Tomcat?</dt>
+										<dd>
+											<p>The approach that mod_cfml takes is to "ride" existing methods. That is, mod_cfml modifies the INCOMING request headers to include additional headers. These headers, as well as additional host information such as the "hostname" is read and utilized by the Tomcat Valve to dynamically create a host or host alias for all hosts on the server.</p>
+										</dd>
+										<dt>How does mod_cfml know which incoming requests to modify, and which not?</dt>
+										<dd>
+											<p>Modifying the incoming request header information for specific requests can cause problems depending on the kind of request that's being passed. Requests for images, for example, do not always complete properly if they contain stange headers like a "X-Tomcat-DocRoot" header.</p>
+											<p>To protect from these potential problems, mod_cfml reviews incoming requests and only modifies those requests that match its "CFMLHandlers" directive. That is. the kinds of files mod_cfml is supposed to "handle". By default, the CFMLHandlers attribute is set to a value of ".cfm .cfc .cfml". This means that only incoming requests for files that contain that string will be modified. Default documents are also modified as a built-in function of mod_cfml.</p>
+										</dd>
+										<dt>Can mod_cfml handle SES URL's?</dt>
+										<dd>
+											<p>Yes. Better even, since version 1.1, mod_cfml makes it possible to use SES URLs with a Tomcat backend, which is normally impossible to do.</p>
+											<p>If mod_cfml encounters path_info after the file extension, eg. /blog.cfm/id/17, the original request uri in Apache will be modified by stripping off the "/id/17", and re-adding that value in a new request header called "x-ajp-path-info". The CFML engines Lucee, Railo, and Open Blue Dragon support this header as a replacement for the regular path_info. The idea behind this comes from Bilal Soylu, who already implemented this in the BonCode connector.</p>
+										</dd>
+										<dt>What are the performance implications of mod_cfml.so?</dt>
+										<dd>
+											<p>Mod_cfml, thankfully, is a very very small piece of software in terms of most software. It's memory footprint and compile times are almost imperceptable. However, mod_cfml will add a small amount of time to each request. No official benchmarking has been done, our simplistic tests indicate that mod_cfml.so adds less then 1ms to each request.</p>
+										</dd>
+										<dt>Can I run mod_cfml.so in a cluster environment?</dt>
+										<dd>
+											<p>Yes. Mod_cfml.so works well in a cluster systems that deal with many domains and system administrators can potentially save a great deal of configuration time by using mod_cfml.so.</p>
+										</dd>
+										<dt>Can I use mod_cfml with web languages other then CFML?</dt>
+										<dd>
+											<p>Yes. mod_cfml was developed by the CFML community, but can easily be utilized by other languages that are supported in Tomcat, such as JSP.</p>
+										</dd>
+									</dl>
+
+								</section>
+
+						</div>
+					</div>
+
+
+
+				<!-- Sidebar -->
+					<div id="sidebar">
+						<div class="inner">
+
+							<!-- Menu -->
+								<nav id="menu">
+									<header class="major">
+										<h2>Menu</h2>
+									</header>
+									<ul>
+										<li><a href="index.html">Homepage</a></li>
+										<li><a href="download.html">Download</a></li>
+										<li><span style="cursor: default; color: #7f888f">Documentation</span></li>
+										<li><a href="introduction.html">- Introduction</a></li>
+										<li><a href="docs-modcfml.html">- Apache mod_cfml.so</a></li>
+										<li><a href="docs-valve.html">- Tomcat Valve</a></li>
+										<li><span style="cursor: default; color: #7f888f">Installation</span></li>
+										<li><a href="install-nginx.html">- NGINX (all OS's)</a></li>
+										<li><a href="install-win-iis.html">- IIS on Windows</a></li>
+										<li><a href="install-win-apache.html">- Apache on Windows</a></li>
+										<li><a href="install-lin-centos.html">- Apache on CentOS</a></li>
+										<li><a href="install-lin-ubuntu.html">- Apache on Ubuntu</a></li>
+										<li><a href="install-valve-lin.html">- Tomcat Valve on Linux</a></li>
+										<li><a href="install-valve-win.html">- Tomcat Valve on Windows</a></li>
+										<li><a href="support.html">Support</a></li>
+									</ul>
+								</nav>
+
+							<!-- Footer -->
+								<footer id="footer">
+									<p class="copyright">&copy; <a href="https://viviotech.net/">Vivio Technologies Inc.</a> All rights reserved. Images: <a href="https://unsplash.com">Unsplash</a>. Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+								</footer>
+
+						</div>
+					</div>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/skel.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

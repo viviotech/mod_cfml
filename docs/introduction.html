@@ -1,0 +1,106 @@
+<!DOCTYPE HTML>
+<!--
+	Editorial by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>mod_cfml - Introduction</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+	</head>
+	<body>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<div id="main">
+						<div class="inner">
+
+							<!-- Header -->
+								<header id="header">
+									<a href="index.html" class="logo"><strong>mod_cfml</strong> by Vivio Technologies</a>
+									<ul class="icons">
+										<li><a href="https://github.com/viviotech" class="icon fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="https://viviotech.net/" class="icon fa-home"><span class="label">Vivio Homepage</span></a></li>
+										<li><a href="https://twitter.com/viviotech" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="https://www.facebook.com/viviotech/" class="icon fa-facebook"><span class="label">Facebook</span></a></li>
+									</ul>
+								</header>
+
+							<!-- Content -->
+								<section>
+									<header class="main">
+										<h1>Introduction</h1>
+									</header>
+
+									<p><span class="image right"><img src="images/mod_cfml_flow-1_1.png" alt="mod_cfml flow chart" style="width: 260px; height: 257px;" /></span>Mod_cfml is a suite of programs that automatically configure Tomcat to support web hosts that are already configured in your web server.<br>
+									<br>
+									Mod_cfml has two components that need to be installed in order to function properly: the <a href="install-web.html">Web Server Component</a> and the <a href="install-tc.html">Tomcat Component</a>.<br>
+									<br>
+									The Web Server Component takes your web servers configuration, and passes that information to the Tomcat Component (a Tomcat valve). The Tomcat valve then creates hosts in Tomcat automatically based on the information that is sent to it from the Web Server Component. The Web Server Component consists of the mod_cfml.so module for Apache or the BonCode Connector for IIS.<br>
+									<br>
+									The mod_cfml.so Apache module is not a "connector" on it's own, so you will need to use it in conjunction with either mod_proxy or mod_jk which perform the actual Tomcat connection. If you don't know what a "connector" is, don't worry! This documentation includes a quick install of mod_proxy, which is a great connector if you don't have one installed already. Mod_cfml has been tested with mod_proxy and mod_jk and either will work just fine.</p>
+
+									<hr class="major" />
+
+								</section>
+
+						</div>
+					</div>
+
+
+
+				<!-- Sidebar -->
+					<div id="sidebar">
+						<div class="inner">
+
+							<!-- Menu -->
+								<nav id="menu">
+									<header class="major">
+										<h2>Menu</h2>
+									</header>
+									<ul>
+										<li><a href="index.html">Homepage</a></li>
+										<li><a href="download.html">Download</a></li>
+										<li><span style="cursor: default; color: #7f888f">Documentation</span></li>
+										<li><a href="introduction.html">- Introduction</a></li>
+										<li><a href="docs-modcfml.html">- Apache mod_cfml.so</a></li>
+										<li><a href="docs-valve.html">- Tomcat Valve</a></li>
+										<li><span style="cursor: default; color: #7f888f">Installation</span></li>
+										<li><a href="install-nginx.html">- NGINX (all OS's)</a></li>
+										<li><a href="install-win-iis.html">- IIS on Windows</a></li>
+										<li><a href="install-win-apache.html">- Apache on Windows</a></li>
+										<li><a href="install-lin-centos">- Apache on CentOS</a></li>
+										<li><a href="install-lin-ubuntu">- Apache on Ubuntu</a></li>
+										<li><a href="install-valve-lin">- Tomcat Valve on Linux</a></li>
+										<li><a href="install-valve-win">- Tomcat Valve on Windows</a></li>
+										<li><a href="support.html">Support</a></li>
+									</ul>
+								</nav>
+
+							<!-- Footer -->
+								<footer id="footer">
+									<p class="copyright">&copy; <a href="https://viviotech.net/">Vivio Technologies Inc.</a> All rights reserved. Images: <a href="https://unsplash.com">Unsplash</a>. Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+								</footer>
+
+						</div>
+					</div>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/skel.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE HTML>
+<!--
+	Editorial by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>mod_cfml - Installation - IIS on Windows</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+	</head>
+	<body>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<div id="main">
+						<div class="inner">
+
+							<!-- Header -->
+								<header id="header">
+									<a href="index.html" class="logo"><strong>mod_cfml</strong> by Vivio Technologies</a>
+									<ul class="icons">
+										<li><a href="https://github.com/viviotech" class="icon fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="https://viviotech.net/" class="icon fa-home"><span class="label">Vivio Homepage</span></a></li>
+										<li><a href="https://twitter.com/viviotech" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="https://www.facebook.com/viviotech/" class="icon fa-facebook"><span class="label">Facebook</span></a></li>
+									</ul>
+								</header>
+
+							<!-- Content -->
+								<section>
+									<header class="main">
+										<h1>IIS on Windows</h1>
+									</header>
+
+									<h2>Install mod_cfml to IIS on Windows</h2>
+
+									<p>The following steps cover all the steps necessary to install the BonCode Connector module into IIS on a Windows System and enable mod_cfml support from within the connector. The steps are intended to be thorough, so you may not need to take each step on your own system. For example, you may already have IIS and some of the required modules installed on your system.</p>
+
+									<div class="box">
+										<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT: The following tutorial describes the installation of the BonCode Connector for 32-bit Windows 7 Professional. You may need to adjust these directions slightly to match your Windows system version.</p>
+									</div>
+
+									<h3>Installing IIS</h3>
+
+									<p>If you don't already have IIS installed on your system, you can install it by taking the following path:</p>
+									<p>-&gt; Control Panel -&gt; Programs and Features -&gt; Turn Windows features on or off</p>
+									<img alt="Windows Features" src="images/windows_features.png" style="width: 610px; height: 383px; " />
+									<p>Next find the &quot;Internet Information Services&quot; (IIS), and check it to mark that you want to install IIS. I also recommend installing &quot;.NET Extensibility&quot; here as it will shorten the install for the BonCode Connector:</p>
+									<img alt="Install IIS" src="images/install_iis_etc.png" style="width: 466px; height: 563px; " />
+									<p>Hit &quot;OK&quot; and let Windows do it's thing. When you're done, you should be able to hit the following URL and get the IIS welcome page:</p>
+									<p>http://127.0.0.1/</p>
+
+									<h3>Preparing Your System for the The BonCode Connector</h3>
+
+									<p>The <a href="http://www.boncode.net/boncode-connector" target="_blank">BonCode Connector</a> by Bilal Soylu is a complete connector package. It does not need to be installed alongside anything else like the mod_cfml.so Apache module does. Further, if you already have a connector installed, such as the Tomcat isapi_redirect.dll connector, that connector will need to be removed before you install the BonCode Connector in order to avoid conflicts.</p>
+
+									<div class="box">
+										<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT: Installing the BonCode Connector along with Tomcat's isapi_redirect.dll can cause conflicts and irregularities.</p>
+									</div>
+
+									<p>If you installed an open-source CFML engine using either the Railo Installer or OpenBD Installer, removing the Tomcat isapi_redirect.dll connector is very easy. The Installers come with a batch file that automates the connector's removal from your system. To run the batch file, simply open a command-line window in Administrative mode. In Windows 7 Professional, you can do that with the following:</p>
+									<p>Start -&gt; All Programs -&gt; Accessories -&gt; Right -click the &quot;Command Prompt&quot; icon and select &quot;Run as Administrator&quot;</p>
+									<p>If you successfully started a command-line window as the Administrator, your command line window will read: &quot;Administrator: Command Prompt&quot;, like so:</p>
+									<p><img alt="Administrator Command Prompt" src="images/administrator_command_prompt.png" style="width: 555px; height: 165px; " /></p>
+									<p>Next navigate to the [Install Dir]\connector\ directory. Usually this is c:\railo\connector:</p>
+									<pre><code>&gt; cd c:\railo\connector</code></pre>
+									<p>Next, run the removal batch file. For IIS7, the removal script is iis7remove.bat:</p>
+									<pre><code>&gt; iis7remove.bat</code></pre>
+									<p>Obviously, if you're running IIS6, you'll want to run iis6remove.bat.</p>
+									<p>Last, you'll want to ensure to remove any &quot;jakarta&quot; directories from any previous CFML-enabled sites. The &quot;jakarta&quot; directory is no longer needed with the BonCode Connector.</p>
+
+									<h3>Installing the BonCode Connector</h3>
+
+									<p>If you haven't already, take a moment to go download the BonCode Connector: <a href="http://www.boncode.net/boncode-connector" target="_blank">http://www.boncode.net/boncode-connector</a></p>
+									<p>Next, go ahead and launch the BonCode Connector installer:</p>
+									<img alt="BonCode Installer" src="images/run_boncode_installer.png" style="width: 510px; height: 388px; " />
+									<p>When you get to the screen that ask you if you want the BonCode Connector applied to All Sites or to Individual Sites, it is recommended that you select &quot;All IIS Sites&quot;. Selecting this method should reduce the amount of work it takes to administer each site.</p>
+
+									<div class="box">
+										<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT: Do not attempt to run the installer if you have pending system updates. Many updates prevent the installation of additional software until the updates have been fully installed with a reboot. Finish installing the updates, then install the connector.</p>
+									</div>
+									
+									<img alt="BonCode Applied to All Sites" src="images/boncode_allsites.png" style="width: 512px; height: 396px; " />
+
+									<p>It is also recommended that you pass all JSP or CFM or CFC requests off to Tomcat. This will ensure that anything Tomcat-related gets passed to Tomcat.</p>
+
+									<img alt="BonCode Connector pass JSP, CFM, CFC to Tomcat" src="images/boncode_defaultpass.png" style="width: 516px; height: 397px; " />
+
+									<div class="box">
+										<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT: Installation can take several minutes as the installer configures the various software packages and installs the software it needs to do it's job. <strong>Please be patient.</strong></p>
+									</div>
+
+									<p>You should now be able to create sites and hit the CFML files within them and get a response from Tomcat and the CFML engine, but your CFML files will not be resolving to the right spots yet! This is where the mod_cfml tomcat valve comes in.</p>
+
+									<h3>Configuring the BonCode Connector for use with mod_cfml</h3>
+									
+									<p>Next we need to configure the BonCode connector to pass on the information that the Tomcat Valve will need in order to dynamically create the hosts. To do this, we need to edit the connector's &quot;BonCodeAJP13.settings&quot; file. If you installed the connector into &quot;All Sites&quot;, then this file will be in the Windows system32 directory:</p>
+
+									<pre><code>&gt; c:\windows\system32\BonCodeAJP13.settings</code></pre>
+
+									<p>If you installed the connector on a per-site basis, then the &quot;BonCodeAJP13.settings&quot; file will be in the &quot;BIN&quot; directory inside your site's home directory. For example, for the IIS &quot;Default Site&quot;, the home directory is &quot;c:\inetpub\wwwroot&quot;, so the settings file we want will be in:</p>
+
+									<pre><code>&gt; c:\inetpub\wwwroot\BIN\BonCodeAJP13.settings</code></pre>
+
+									<p>In order to edit these files, you may need to edit it with a copy of notepad running under the Administrator user. You can do this usually by right clicking the &quot;Notepad&quot; icon in the start menu and selecting &quot;Run as Administrator&quot;, like so:</p>
+
+									<img alt="" src="images/run_as_admin.png" style="width: 406px; height: 474px; " />
+
+									<p>Once you have notepad running under the Administrator user, go to File -&gt; Open, and navigate to the c:\windows\system32 directory. You may need to select &quot;All Files&quot; from the drop down file filter:</p>
+
+									<img alt="Show all files when looking for boncode settings" src="images/boncode_np_allfiles.png" style="border-style: initial; border-color: initial; font-size: 12px; width: 635px; height: 524px; " />
+
+									<p>There are a LOT of files in the system32 folder, but they should be sorted alphabetically which should help you find the right file.</p>
+									<p>We need to add the following option to the setting file:</p>
+
+									<pre><code>&lt;EnableHeaderDataSupport&gt;True&lt;/EnableHeaderDataSupport&gt;</code></pre>
+
+									<p>I just added my line to the last line of the configs, so that my config file looks like this now:</p>
+
+									<pre><code>&lt;Settings&gt;
+&nbsp; &lt;Port&gt;8009&lt;/Port&gt;
+&nbsp; &lt;Server&gt;localhost&lt;/Server&gt;
+&nbsp; &lt;MaxConnections&gt;200&lt;/MaxConnections&gt;
+&nbsp; &lt;LogLevel&gt;0&lt;/LogLevel&gt;
+&nbsp; &lt;FlushThreshold&gt;0&lt;/FlushThreshold&gt;
+&nbsp; &lt;EnableRemoteAdmin&gt;False&lt;/EnableRemoteAdmin&gt;
+&nbsp; &lt;EnableHeaderDataSupport&gt;True&lt;/EnableHeaderDataSupport&gt;
+&lt;/Settings&gt;</code></pre>
+									<p>The BonCode Connector should pick up the changed config almost immediately. You should be all set!</p>
+
+								</section>
+
+						</div>
+					</div>
+
+
+
+				<!-- Sidebar -->
+					<div id="sidebar">
+						<div class="inner">
+
+							<!-- Menu -->
+								<nav id="menu">
+									<header class="major">
+										<h2>Menu</h2>
+									</header>
+									<ul>
+										<li><a href="index.html">Homepage</a></li>
+										<li><a href="download.html">Download</a></li>
+										<li><span style="cursor: default; color: #7f888f">Documentation</span></li>
+										<li><a href="introduction.html">- Introduction</a></li>
+										<li><a href="docs-modcfml.html">- Apache mod_cfml.so</a></li>
+										<li><a href="docs-valve.html">- Tomcat Valve</a></li>
+										<li><span style="cursor: default; color: #7f888f">Installation</span></li>
+										<li><a href="install-nginx.html">- NGINX (all OS's)</a></li>
+										<li><a href="install-win-iis.html">- IIS on Windows</a></li>
+										<li><a href="install-win-apache.html">- Apache on Windows</a></li>
+										<li><a href="install-lin-centos.html">- Apache on CentOS</a></li>
+										<li><a href="install-lin-ubuntu.html">- Apache on Ubuntu</a></li>
+										<li><a href="install-valve-lin.html">- Tomcat Valve on Linux</a></li>
+										<li><a href="install-valve-win.html">- Tomcat Valve on Windows</a></li>
+										<li><a href="support.html">Support</a></li>
+									</ul>
+								</nav>
+
+							<!-- Footer -->
+								<footer id="footer">
+									<p class="copyright">&copy; <a href="https://viviotech.net/">Vivio Technologies Inc.</a> All rights reserved. Images: <a href="https://unsplash.com">Unsplash</a>. Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+								</footer>
+
+						</div>
+					</div>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/skel.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

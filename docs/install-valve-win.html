@@ -1,0 +1,158 @@
+<!DOCTYPE HTML>
+<!--
+	Editorial by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>mod_cfml - Installation - Apache on Centos</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+	</head>
+	<body>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<div id="main">
+						<div class="inner">
+
+							<!-- Header -->
+								<header id="header">
+									<a href="index.html" class="logo"><strong>mod_cfml</strong> by Vivio Technologies</a>
+									<ul class="icons">
+										<li><a href="https://github.com/viviotech" class="icon fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="https://viviotech.net/" class="icon fa-home"><span class="label">Vivio Homepage</span></a></li>
+										<li><a href="https://twitter.com/viviotech" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="https://www.facebook.com/viviotech/" class="icon fa-facebook"><span class="label">Facebook</span></a></li>
+									</ul>
+								</header>
+
+							<!-- Content -->
+								<section>
+									<header class="main">
+										<h1>Tomcat Valve on Windows</h1>
+									</header>
+
+									<h2>Install mod_cfml Tomcat Valve on Windows</h2>
+
+									<p>The mod_cfml Tomcat Valve is the part of the mod_cfml suite that takes the information passed to it from the Web Server and automatically creates a Tomcat host or host alias with it. The following steps cover what's required to install the mod_cfml Tomcat Valve on to a Tomcat instance on Windows.</p>
+
+									<h3>Download mod_cfml Tomvat Valve</h3>
+
+									<p>If you haven't already, go ahead and <a href="download.html">download the mod_cfml Tomcat Valve.</a></p>
+
+									<h3>Install the mod_cfml Tomvat Valve</h3>
+
+									<p>Once you have it downloaded, move the JAR file to the [Tomcat Home]/lib/ directory. The Tomcat &quot;lib&quot; directory gets loaded whenever Tomcat starts, so having the jar file in the lib directory means that the mod_cfml libraries will be loaded every time Tomcat starts.</p>
+									<p>The default installation directory for Tomcat if you used the Tomcat 7 installer is: &quot;C:\Program Files\Apache Software Foundation\Tomcat 7.0&quot;, so you would need to copy the mod_cfml-valve.jar file would be:</p>
+
+									<pre><code>C:\Program Files\Apache Software Foundation\Tomcat 7.0\lib\</code></pre>
+
+									<p>If you installed with the Lucee Installer, the Tomcat directory will be here by default:</p>
+
+									<pre><code>C:\lucee\tomcat\lib\</code></pre>
+
+									<img alt="move jar to lib" src="images/move_tcvalve_to_lib.png" style="width: 679px; height: 650px; " />
+
+									<p>You will probably get prompted for Administrative rights...</p>
+
+									<img alt="jar move permissions" src="images/jar_move_perms.png" style="width: 504px; height: 255px; " />
+
+									<p>I just hit &quot;Continue&quot; and the file was copied over. Different versions may require different actions. For example, you may have to enter in the administrator password on Win Server 2008 systems.</p>
+
+									<h3>Configure the mod_cfml Tomcat Valve</h3>
+
+									<p>Now that we have the mod_cfml JAR installed, we need to configure Tomcat to use it. To configure the Valve, we need to add it to the Tomcat server.xml file, located here:</p>
+
+									<pre><code>C:\Program Files\Apache Software Foundation\Tomcat 7.0\conf\server.xml</code></pre>
+
+									<p>If you installed with the Railo Installer, the Tomcat server.xml file will be here by default:</p>
+
+									<pre><code>C:\lucee\tomcat\conf\server.xml</code></pre>
+
+									<p>Next, we need to add the following line to the default Tomcat host. As long as you didn't change it, the default host is the &quot;localhost&quot; host. Add this line in between the opening &lt;host ...="" name="localhost"&gt; and the closing &lt;/host&gt; entries:</p>
+
+									<pre><code>&lt;Valve
+className="mod_cfml.core"
+loggingEnabled="false"
+maxContexts="100"
+timeBetweenContexts="0"
+scanClassPaths="false"
+sharedKey="secret key also set in the Apache/IIS config" /&gt;</code></pre>
+
+									<p>Here's what adding that line would look like on a default Tomcat for Windows install:</p>
+
+									<img alt="Tomcat Valve Config" src="images/notepad-valve-config.png" style="width: 834px; height: 484px;" />
+
+									<p>Notice how there are a lot of comments and other potentially confusing junk in there. Don't let that confuse you! Make sure the Valve line in is between the localhost opening &lt;Host&gt; and closing &lt;/Host&gt; tags!</p>
+
+									<h3>Restart Tomcat</h3>
+
+									<p>The final step is to restart Tomcat. You can do this under the Windows Service controls, or by using the start menu links like so:</p>
+									<p>-&gt; Start -&gt; All Programs -&gt; Apache Tomcat 7.0 Tomcat7 -&gt; Configure Tomcat -&gt; Right-Click and select &quot;Run as Administrator&quot;</p>
+
+									<img alt="Run Tomcat As Admin" src="images/run_tc_as_admin.png" style="width: 397px; height: 500px; " />
+
+									<p>Once you're restarted Tomcat, you should be all set!</p>
+
+								</section>
+
+						</div>
+					</div>
+
+
+
+				<!-- Sidebar -->
+					<div id="sidebar">
+						<div class="inner">
+
+							<!-- Menu -->
+								<nav id="menu">
+									<header class="major">
+										<h2>Menu</h2>
+									</header>
+									<ul>
+										<li><a href="index.html">Homepage</a></li>
+										<li><a href="download.html">Download</a></li>
+										<li><span style="cursor: default; color: #7f888f">Documentation</span></li>
+										<li><a href="introduction.html">- Introduction</a></li>
+										<li><a href="docs-modcfml.html">- Apache mod_cfml.so</a></li>
+										<li><a href="docs-valve.html">- Tomcat Valve</a></li>
+										<li><span style="cursor: default; color: #7f888f">Installation</span></li>
+										<li><a href="install-nginx.html">- NGINX (all OS's)</a></li>
+										<li><a href="install-win-iis.html">- IIS on Windows</a></li>
+										<li><a href="install-win-apache.html">- Apache on Windows</a></li>
+										<li><a href="install-lin-centos.html">- Apache on CentOS</a></li>
+										<li><a href="install-lin-ubuntu.html">- Apache on Ubuntu</a></li>
+										<li><a href="install-valve-lin.html">- Tomcat Valve on Linux</a></li>
+										<li><a href="install-valve-win.html">- Tomcat Valve on Windows</a></li>
+										<li><a href="support.html">Support</a></li>
+									</ul>
+								</nav>
+
+							<!-- Footer -->
+								<footer id="footer">
+									<p class="copyright">&copy; <a href="https://viviotech.net/">Vivio Technologies Inc.</a> All rights reserved. Images: <a href="https://unsplash.com">Unsplash</a>. Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+								</footer>
+
+						</div>
+					</div>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/skel.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

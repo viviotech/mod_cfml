@@ -1,0 +1,165 @@
+<!DOCTYPE HTML>
+<!--
+	Editorial by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>mod_cfml - Installation - Apache on Windows</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+	</head>
+	<body>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<div id="main">
+						<div class="inner">
+
+							<!-- Header -->
+								<header id="header">
+									<a href="index.html" class="logo"><strong>mod_cfml</strong> by Vivio Technologies</a>
+									<ul class="icons">
+										<li><a href="https://github.com/viviotech" class="icon fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="https://viviotech.net/" class="icon fa-home"><span class="label">Vivio Homepage</span></a></li>
+										<li><a href="https://twitter.com/viviotech" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="https://www.facebook.com/viviotech/" class="icon fa-facebook"><span class="label">Facebook</span></a></li>
+									</ul>
+								</header>
+
+							<!-- Content -->
+								<section>
+									<header class="main">
+										<h1>Apache on Windows</h1>
+									</header>
+
+									<h2>Install mod_cfml to Apache on Windows</h2>
+
+									<p>The following steps cover all the steps necessary for install the mod_cfml module into Apache on a Windows System. The steps are intended to be thorough, so you may not need to take each step on your own system. For example, you may already have Apache and some of the required modules installed on your system. Feel free to skip those steps as needed.</p>
+
+									<h3>Installing Apache</h3>
+
+									<p>If you have not yet installed Apache on your system, please make sure to install <u>Apache version 2.4</u>.</p>
+									<p>Installing Apache on Windows is as simple as downloading and extracting a zip file. The Apache Software Foundation does not host binary distributions themselves, so they can be downloaded from eg. <a href="http://www.apachehaus.com/cgi-bin/download.plx">ApacheHaus</a> or <a href="http://www.apachelounge.com/download/">Apache Lounge</a>.</p>
+									<p>For this tutorial, we'll download <em>httpd-2.4.12-win64-VC11.zip</em> from Apache Lounge. The zip file contains 1 directory &quot;Apache24&quot;, and a ReadMe.txt. Following the install instructions in the ReadMe.txt file, you will end up with Apache 2.4 being installed in C:/Apache24/</p>
+
+									<h3>Configuring mod_proxy</h3>
+
+									<p>Mod_proxy is a connector, that is, it passes requests off to Tomcat for processing, thus &quot;connecting&quot; Apache to Tomcat. Both mod_proxy and mod_jk have been tested with mod_cfml and both work great. <strong>If you already have mod_proxy or mod_jk installed, then you may skip this step. </strong>However, since you do need one or the other installed, we will cover installing mod_proxy quickly here. This is not intended to be documentation on mod_proxy, but enough to get you up and running. Full mod_proxy documentation is available on the <a href="http://httpd.apache.org/docs/2.0/mod/mod_proxy.html" target="_blank">Apache Web Site</a>.</p>
+									<p>mod_proxy and mod_proxy_ajp are part of the default Apache Lounge distributions, however, they are disabled by default. So, we will need to edit the Apache configuration to enable mod_proxy.</p>
+									<p>In this documentation, we're going to be using &quot;notepad&quot; to edit our config files. In order for our user to have permission to edit the files we need to edit, we will need to open up &quot;notepad&quot; as an administrator. In Windows7 and Windows Server, you can open programs as the Administrator user by right-clicking on them and selecting &quot;Run as Administrator&quot;, like in this Windows7 screenshot (you may be prompted to enter the administrator password):</p>
+									<p><img alt="run as administrator" src="images/run_as_admin.png" style="width: 406px; height: 474px; " /></p>
+									<p>Now that we have Notepad open as an Administrator, we go to File-&gt;Open, and navigate to the following:</p>
+									
+									<pre><code>C:\Apache24\conf\httpd.conf</code></pre>
+
+									<div class="box">
+										<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT:  We will use this method of opening programs as the administrator user repeatedly during this tutorial.</p>
+									</div>
+
+									<p>You may need to select the &quot;All Files&quot; option from the drop-down menu in order to see the httpd.conf file that you need to select.</p>
+									<p><img alt="Show All Files" src="images/notepad-open-allfiles.png" style="width: 688px; height: 434px;" /></p>
+									<p>The first thing that we need to do is enable mod_proxy and mod_proxy_ajp. When the file is open in Notepad, hit CTRL+F to open up the find window. In the find window, type in &quot;proxy&quot;:</p>
+									<p><img alt="Search for Proxy" src="images/search_for_proxy.png" style="width: 473px; height: 229px; " /></p>
+									<p>Hit the &quot;Find Next&quot; button, and you should be taken to the very line that we need to uncomment. See the hash tags (&quot;#&quot;) that are in front of the proxy lines? Those need to be removed in order to uncomment them. You need to uncomment mod_proxy and mod_proxy_ajp. Like so:</p>
+									<p><img alt="Uncomment mod_proxy" src="images/uncomment_mod_proxy.png" style="width: 458px; height: 141px; " /></p>
+									<p>Now that mod_proxy and mod_proxy_ajp have been uncommented, add the following to the very bottom of the file:</p>
+
+									<pre><code>&lt;Proxy *&gt;
+# When using Apache 2.2, use the following line (without the &quot;# &quot;)
+# Allow from 127.0.0.1
+# When using Apache 2.4, use this line (without the &quot;# &quot;)
+# Require ip 127.0.0.1
+&lt;/Proxy&gt;
+ProxyPreserveHost On
+ProxyPassMatch ^/(.+\.cf[cm])(/.*)?$ ajp://localhost:8009/$1$2</code></pre>
+
+									<p>The config above is designed to send any request that Apache gets that has a &quot;.cfm&quot; or &quot;.cfc&quot; in it to be passed off to Tomcat. This configuration is obviously intended for CFML processing engines, but you can also use a statement similar to the above to pass &quot;.jsp&quot; files off to Tomcat, and mod_cfml will create contexts for those sites as well. Feel free to experiment here however you need to.</p>
+									<p>Now restart Apache so your changes take effect. If you installed the ApacheMonitor.exe, there should be a little pink feather in your task-bar. left-click it (not right-click) hover over &quot;Apache 2.4&quot;, and select &quot;Restart&quot;. Right-clicking will enable you to bring up the Apache monitor window, where you can also restart Apache if you want. You will be prompted for admin rights if you're doing this as a non-administrator user.</p>
+									<img alt="" src="images/restart_apache_hereorhere.png" style="width: 531px; height: 424px; " />
+
+									<h3>mod_cfml.so prerequisites</h3>
+
+									<p>Be sure that you have installed the Visual C++ 2010 SP1 Redistributable Package: Win64 <a href="http://www.microsoft.com/download/en/details.aspx?id=13523" target="_blank">vcredist_x64.exe</a>, Win32 <a href="http://www.microsoft.com/download/en/details.aspx?id=8328" target="_blank">vcredist_x86.exe</a></p>
+
+									<h3>Installing mod_cfml.so</h3>
+
+									<p>Depending on the architecture of your Apache install, you either need to install the 64-bit or 32-bit module:</p>
+									<p><a href="https://github.com/utdream/mod_cfml/blob/master/C/builds/windows-httpd24-x64/mod_cfml.so?raw=true">Download Windows Apache2.4 <strong>64bit</strong> mod_cfml.so</a> &nbsp;&nbsp;&nbsp; <a href="https://github.com/utdream/mod_cfml/blob/master/C/builds/windows-httpd24-x86/mod_cfml.so?raw=true">Download Windows Apache2.4 <strong>32bit</strong> mod_cfml.so</a></p>
+									<p><a href="https://github.com/utdream/mod_cfml/blob/master/C/builds/windows-httpd22-x64/mod_cfml.so?raw=true">Download Windows Apache2.2 <strong>64bit</strong> mod_cfml.so</a> &nbsp;&nbsp;&nbsp; <a href="https://github.com/utdream/mod_cfml/blob/master/C/builds/windows-httpd22-x86/mod_cfml.so?raw=true">Download Windows Apache2.2 <strong>32bit</strong> mod_cfml.so</a></p>
+									<p>Move the downloaded file to C:/Apache24/modules/&nbsp; (or C:/Apache22/modules/)</p>
+									<p>Now, open up httpd.conf like we did before, and add the following to the end of the file:</p>
+
+									<pre><code>LoadModule modcfml_module modules/mod_cfml.so
+CFMLHandlers &quot;.cfm .cfc .cfml&quot;
+ModCFML_SharedKey &quot;secret key also set in the Tomcat valve config&quot;
+# Optional, all for logging and debugging:
+# LogHeaders true
+# LogHandlers true
+# LogAliases true
+# VDirHeader false</code></pre>
+
+								<p>Save the file, and then restart Apache.</p>
+								<p>You are now all done now on the Apache side! Congrats, and continue to the <a href="install-tc.html">Tomcat instructions</a>.</p>
+
+								</section>
+
+						</div>
+					</div>
+
+
+
+				<!-- Sidebar -->
+					<div id="sidebar">
+						<div class="inner">
+
+							<!-- Menu -->
+								<nav id="menu">
+									<header class="major">
+										<h2>Menu</h2>
+									</header>
+									<ul>
+										<li><a href="index.html">Homepage</a></li>
+										<li><a href="download.html">Download</a></li>
+										<li><span style="cursor: default; color: #7f888f">Documentation</span></li>
+										<li><a href="introduction.html">- Introduction</a></li>
+										<li><a href="docs-modcfml.html">- Apache mod_cfml.so</a></li>
+										<li><a href="docs-valve.html">- Tomcat Valve</a></li>
+										<li><span style="cursor: default; color: #7f888f">Installation</span></li>
+										<li><a href="install-nginx.html">- NGINX (all OS's)</a></li>
+										<li><a href="install-win-iis.html">- IIS on Windows</a></li>
+										<li><a href="install-win-apache.html">- Apache on Windows</a></li>
+										<li><a href="install-lin-centos.html">- Apache on CentOS</a></li>
+										<li><a href="install-lin-ubuntu.html">- Apache on Ubuntu</a></li>
+										<li><a href="install-valve-lin.html">- Tomcat Valve on Linux</a></li>
+										<li><a href="install-valve-win.html">- Tomcat Valve on Windows</a></li>
+										<li><a href="support.html">Support</a></li>
+									</ul>
+								</nav>
+
+							<!-- Footer -->
+								<footer id="footer">
+									<p class="copyright">&copy; <a href="https://viviotech.net/">Vivio Technologies Inc.</a> All rights reserved. Images: <a href="https://unsplash.com">Unsplash</a>. Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+								</footer>
+
+						</div>
+					</div>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/skel.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

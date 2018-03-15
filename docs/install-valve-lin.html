@@ -6,7 +6,7 @@
 -->
 <html>
 	<head>
-		<title>mod_cfml - Homepage</title>
+		<title>mod_cfml - Installation - Apache on Centos</title>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
@@ -34,88 +34,62 @@
 									</ul>
 								</header>
 
-							<!-- Banner -->
-								<section id="banner">
-									<div class="content">
-										<header>
-											<h1>mod_cfml</h1>
-											<p>Automatically configure Tomcat hosts to match hosts created in Apache or IIS</p>
-										</header>
-										<p>Mod_cfml is a community-driven suite of programs that automatically configures Tomcat hosts to match hosts created in Apache, NGINX, or IIS. Mod_cfml removes the need to configure web sites twice - once in your web server and again in Tomcat - and performs this task automatically for you.</p>
-										<ul class="actions">
-											<li><a href="introduction.html" class="button big">Introduction</a></li>
-											<li><a href="download.html" class="button big">Download</a></li>
-										</ul>
-									</div>
-									<span class="image object">
-										<img src="images/pic10.jpg" alt="" />
-									</span>
-								</section>
-
-							<!-- Section -->
+							<!-- Content -->
 								<section>
-									<header class="major">
-										<h2>Documentation</h2>
+									<header class="main">
+										<h1>Tomcat Valve on Linux</h1>
 									</header>
-									<div class="features">
-										<article>
-											<span class="icon fa-cloud"></span>
-											<div class="content">
-												<h3>Apache mod_cfml.so</h3>
-												<p>The Apache mod_cfml.so module is one of the possible web server components that reads the configuration of the website and passes it on to the Tomcat Valve.</p>
-												<ul class="actions">
-													<li><a href="docs-modcfml.html" class="button">More</a></li>
-												</ul>
-											</div>
-										</article>
-										<article>
-											<span class="icon fa-plug"></span>
-											<div class="content">
-												<h3>The Tomcat Valve</h3>
-												<p>The Tomcat Valve takes the information from the mod_cfml.so Apache module and configures a duplicate host/alias in Tomcat.</p>
-												<ul class="actions">
-													<li><a href="docs-valve.html" class="button">More</a></li>
-												</ul>
-											</div>
-										</article>
-									</div>
-								</section>
 
-							<!-- Section -->
-								<section>
-									<header class="major">
-										<h2>Installation</h2>
-									</header>
-									<div class="posts">
-										<article>
-											<a href="introduction.html" class="image"><img src="images/pic01.jpg" alt="" /></a>
-											<h3>Introduction</h3>
-											<p>An overview of how the various pieces of the mod_cfml project come together. If you're new to mod_cfml, start here.</p>
-											<ul class="actions">
-												<li><a href="introduction.html" class="button">More</a></li>
-											</ul>
-										</article>
-										<article>
-											<a href="install-web.html" class="image"><img src="images/pic02.jpg" alt="" /></a>
-											<h3>Web Components</h3>
-											<p>How to install the various web components necessary to support mod_cfml functionality.</p>
-											<ul class="actions">
-												<li><a href="install-web.html" class="button">More</a></li>
-											</ul>
-										</article>
-										<article>
-											<a href="install-tc.html" class="image"><img src="images/pic03.jpg" alt="" /></a>
-											<h3>Tomcat Component</h3>
-											<p>An overview of how to install the mod_cfml Tomcat Valve on both Linux and Windows.</p>
-											<ul class="actions">
-												<li><a href="install-tc.html" class="button">More</a></li>
-											</ul>
-										</article>
+									<h2>Install mod_cfml Tomcat Valve on Linux</h2>
+
+									<p>The mod_cfml Tomcat Valve is the part of the mod_cfml suite that takes the information passed to it from the Web Server and automatically creates a Tomcat host or host alias with it. The following steps cover installing the mod_cfml Tomcat Valve on a Linux System.</p>
+									<p>All steps provided are done from the command-line for uniformity. If you have a graphic desktop, you can perform these steps by opening a terminal window and running these commands.</p>
+									<p>Also, for the sake of uniformity,<strong> this tutorial will use &quot;/opt/tomcat&quot; as our tomcat installation directory.</strong> Your Tomcat installation directory may be different depending on how you installed it. There are too many methods of installing to cover them all here.</p>
+									<div class="box">
+										<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT: If you're running these commands on Ubuntu / Mint / Debian, you will need to pre-clude them with the &quot;sudo&quot; command. IE: sudo wget...</p>
 									</div>
+
+									<h3>Download mod_cfml Tomvat Valve</h3>
+
+									<p>If you haven't already, go ahead and download the mod_cfml Tomcat Valve.:</p>
+
+									<pre><code>wget https://github.com/viviotech/mod_cfml/blob/master/java/mod_cfml-valve_v1.1.05.jar?raw=true</code></pre>
+
+									<div class="box">
+										<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT: The above URL points to version 1 of mod_cfml. mod_cfml may have been upgraded since this documentation was written. You may need to use an updated URL.</p>
+									</div>
+
+									<p>After you have download the Tomcat Valve, move it to your Tomcat's &quot;lib&quot; directory, which is usually [tomcat home]/lib/. In our example, we'll use /opt/tomcat/ just for the sake of simplicity.</p>
+
+									<pre><code>mv mod_cfml-valve.jar /opt/tomcat/lib/</code></pre>
+
+									<h3>Configure the mod_cfml Tomcat Valve</h3>
+
+									<p>Now that the valve is installed into Tomcat, we need to configure Tomcat to use it. You do that by editing the Tomcat server.xml file and add the mod_cfml Tomcat Valve to the default Host entry. Unless you changed it, the default host entry will be the &quot;localhost&quot; entry. This is the line we will add to add the valve:</p>
+
+									<pre><code>&lt;Valve
+className="mod_cfml.core"
+loggingEnabled="false"
+maxContexts="100"
+timeBetweenContexts="0"
+scanClassPaths="false"
+sharedKey="secret key also set in the Apache/IIS config" /&gt;</code></pre>
+									
+									<p>Here is what my Tomcat server.xml file looks like in the &quot;nano&quot; editor:</p>
+
+									<img alt="Tomcat Valve " src="images/server-xml-ubuntu.png" style="width: 733px; height: 589px;" />
+
+									<h3>Restart Tomcat</h3>
+
+									<p>Now that the valve is installed, restart Tomcat so that the new Valve will go into effect.</p>
+									<p>You should be all set!</p>
+
 								</section>
 
 						</div>
 					</div>
+
+
 
 				<!-- Sidebar -->
 					<div id="sidebar">

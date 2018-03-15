@@ -1,0 +1,169 @@
+<!DOCTYPE HTML>
+<!--
+	Editorial by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>mod_cfml - Installation - NGINX</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+	</head>
+	<body>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<div id="main">
+						<div class="inner">
+
+							<!-- Header -->
+								<header id="header">
+									<a href="index.html" class="logo"><strong>mod_cfml</strong> by Vivio Technologies</a>
+									<ul class="icons">
+										<li><a href="https://github.com/viviotech" class="icon fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="https://viviotech.net/" class="icon fa-home"><span class="label">Vivio Homepage</span></a></li>
+										<li><a href="https://twitter.com/viviotech" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="https://www.facebook.com/viviotech/" class="icon fa-facebook"><span class="label">Facebook</span></a></li>
+									</ul>
+								</header>
+
+							<!-- Content -->
+								<section>
+									<header class="main">
+										<h1>NGINX</h1>
+									</header>
+
+									<h2>Install mod_cfml to NGINX (any OS)</h2>
+
+									<p>Based on some great work by Pete Freitag <a href="https://github.com/foundeo/ubuntu-nginx-lucee/">here</a>, and some additions by the mod_cfml team, mod_cfml now has full nginx support!</p>
+									
+									<h4>Prerequisites</h4>
+									<p>Make sure you are using the latest mod_cfml.jar, at least version 1.1.05. See the <a href="install-tc.html">installation instructions for the Tomcat valve</a>.</p>
+									<p>Background info: <em>the 1.1.05 mod_cfml.jar supports the $document_root as value for the X-WebServer-Context header, which is especially important for Windows users. They will otherwise end up with only one Tomcat host with the Windows drive letter (&quot;C&quot;, &quot;D&quot;, &quot;E&quot;, etc.), since Tomcat will strip anything after the colon (E:\sites\site.com\ would become &quot;E&quot;).</em></p>
+
+									<h5>Webserver setup - Ubuntu with Lucee</h5>
+									<p>The simplest way to go about it, if you are hosting on Ubuntu, is by using the <a href="https://github.com/foundeo/ubuntu-nginx-lucee">&quot;ubuntu-nginx-lucee&quot; install scripts</a> from Pete Freitag / Foundeo. It sets up Tomcat, nginx, Lucee, and mod_cfml, all at once.</p>
+
+									<h5>Webserver setup - general</h5>
+									<p>Here, we assume you already have a webserver setup with nginx on any OS, and you just want to add mod_cfml support, and optionally still need to add proxy support to Lucee/Railo/OBD.</p>
+									<p>In the files underneath, &quot;lucee&quot; is mentioned. You can also use Railo (and probably Open Blue Dragon) with these settings.</p>
+									<p>You will need to copy 2 files to your nginx config folder. This is the folder which contains the main &quot;nginx.conf&quot; file, and is by default located at /usr/local/nginx/conf, /etc/nginx, or /usr/local/etc/nginx. For Windows, it is the conf directory within the nginx main directory, eg. C:\nginx\conf\<br />
+									The 2 files to copy are:</p>
+									<ul>
+										<li><a href="https://github.com/foundeo/ubuntu-nginx-lucee/blob/master/etc/nginx/lucee.conf">https://github.com/foundeo/ubuntu-nginx-lucee/blob/master/etc/nginx/lucee.conf</a></li>
+										<li><a href="https://github.com/foundeo/ubuntu-nginx-lucee/blob/master/etc/nginx/lucee-proxy.conf">https://github.com/foundeo/ubuntu-nginx-lucee/blob/master/etc/nginx/lucee-proxy.conf</a></li>
+									</ul>
+									<p>You might want to change some of the settings in these files, specifically:</p>
+									<ul>
+										<li>In lucee.conf, change &quot;<code>allow 10.0.0.10;</code>&quot; to whatever matches the IPs you want to have access to the Lucee administrator.</li>
+										<li>If you're using Railo, change &quot;<code>location ~* /lucee/ {</code>&quot; to &quot;<code>location ~* /railo-context/ {</code>&quot; in lucee.conf.</li>
+										<li>In lucee-proxy.conf, you might only want to keep the lines underneath &quot;<code>#add headers for mod_cfml to do its work</code>&quot;, if you already have a proxy setup for Lucee.</li>
+										<li>In lucee-proxy.conf, you will need to remove/comment the line &quot;<code>proxy_set_header https $cgi_https;</code>&quot;, if you have not used the full Ubuntu with Lucee setup. Otherwise, an error is thrown for the undefined variable <code>$cgi_https</code>.</li>
+									</ul>
+									<p>Now, you will need to add some lines in each nginx server block, which you want to have mod_cfml support for.<br />
+										A 'server block' is most often configured in either nginx.conf or <code>{nginx directory}/sites-available/*.conf</code>, and looks like this:</p>
+									<pre><code>server {
+  listen 80;
+  server_name example.com;
+  root /web/example.com/wwwroot/;
+}</code></pre>
+									<p>In each server block, you will need to add the following lines:</p>
+									<pre><code>set $lucee_context &quot;[a UNIQUE ID for this server block, eg. the server_name value]&quot;;
+include lucee.conf;</code></pre>
+									<p>Which makes the server block look like this:</p>
+									<pre><code>server {
+   listen 80; 
+   server_name www.example.com; 
+   root /web/example.com/wwwroot/; 
+	 
+   set $lucee_context &quot;www.example.com&quot;;
+   include lucee.conf;
+}</code></pre>
+									<p>After you have edited the server blocks, you need to check if the config does not contain any errors. You can do this from the command-line:</p>
+									<pre><code>$&gt; nginx -t
+# Or on Windows:
+# $&gt; C:\nginx\nginx.exe -t
+
+# if you're getting an error like &quot;bind() to 0.0.0.0:80 failed&quot;, use:
+# $&gt; sudo nginx -t</pre></code>
+								<p>If everything seems good, restart or reload nginx, and you should be good to go!</p>
+								
+								<h5>More info on the $lucee_context variable</h5>
+								<p>Setting the $lucee_context variable is in most nginx setups optional. Beacuse by default, the document-root will be used as a unique ID.<br />
+									But it is required to set, if:</p>
+								<ul>
+									<li>you are using an 'alias' in ANY server block, for example:</li>
+								</ul>
+								<pre><code>server {
+   ......
+   location /demo {
+   alias /path/to/alias/folder;
+   }
+}</pre></code>
+								<ul>
+									<li>you have multiple server blocks with the same 'root' value.</li>
+								</ul>
+								<p>Make sure you give the $lucee_context variable a unique value. It cannot have the same value in multiple server blocks.<br />
+								Otherwise, multiple sites will share the same Lucee context!</p>
+
+								</section>
+
+						</div>
+					</div>
+
+
+
+				<!-- Sidebar -->
+					<div id="sidebar">
+						<div class="inner">
+
+							<!-- Menu -->
+								<nav id="menu">
+									<header class="major">
+										<h2>Menu</h2>
+									</header>
+									<ul>
+										<li><a href="index.html">Homepage</a></li>
+										<li><a href="download.html">Download</a></li>
+										<li><span style="cursor: default; color: #7f888f">Documentation</span></li>
+										<li><a href="introduction.html">- Introduction</a></li>
+										<li><a href="docs-modcfml.html">- Apache mod_cfml.so</a></li>
+										<li><a href="docs-valve.html">- Tomcat Valve</a></li>
+										<li><span style="cursor: default; color: #7f888f">Installation</span></li>
+										<li><a href="install-nginx.html">- NGINX (all OS's)</a></li>
+										<li><a href="install-win-iis.html">- IIS on Windows</a></li>
+										<li><a href="install-win-apache.html">- Apache on Windows</a></li>
+										<li><a href="install-lin-centos.html">- Apache on CentOS</a></li>
+										<li><a href="install-lin-ubuntu.html">- Apache on Ubuntu</a></li>
+										<li><a href="install-valve-lin.html">- Tomcat Valve on Linux</a></li>
+										<li><a href="install-valve-win.html">- Tomcat Valve on Windows</a></li>
+										<li><a href="support.html">Support</a></li>
+									</ul>
+								</nav>
+
+							<!-- Footer -->
+								<footer id="footer">
+									<p class="copyright">&copy; <a href="https://viviotech.net/">Vivio Technologies Inc.</a> All rights reserved. Images: <a href="https://unsplash.com">Unsplash</a>. Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+								</footer>
+
+						</div>
+					</div>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/skel.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

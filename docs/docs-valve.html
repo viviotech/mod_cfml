@@ -1,0 +1,202 @@
+<!DOCTYPE HTML>
+<!--
+	Editorial by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>mod_cfml - Documentation - Tomcat Valve</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+	</head>
+	<body>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<div id="main">
+						<div class="inner">
+
+							<!-- Header -->
+								<header id="header">
+									<a href="index.html" class="logo"><strong>mod_cfml</strong> by Vivio Technologies</a>
+									<ul class="icons">
+										<li><a href="https://github.com/viviotech" class="icon fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="https://viviotech.net/" class="icon fa-home"><span class="label">Vivio Homepage</span></a></li>
+										<li><a href="https://twitter.com/viviotech" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="https://www.facebook.com/viviotech/" class="icon fa-facebook"><span class="label">Facebook</span></a></li>
+									</ul>
+								</header>
+
+							<!-- Content -->
+								<section>
+									<header class="main">
+										<h1>mod_cfml Tomcat Valve</h1>
+									</header>
+
+									<h2>Configuration Options</h2>
+
+									<p>The default Tomcat Valve config line would look something like this in the Tomcat server.xml file:</p>
+									<pre><code>&lt;Valve
+    className="mod_cfml.core"
+    loggingEnabled="false"
+    maxContexts="200"
+    timeBetweenContexts="2000"
+    scanClassPaths="false"
+    sharedKey="secret key also set in the Apache/IIS config" /&gt;</code></pre>
+									<dl>
+										<dt>classname="mod_cfml.core"</dt>
+										<dd>
+											<p><em>Required. Unchangable.</em></p>
+
+											<p>Tells Tomcat to run the mod_cfml.core class when this valve is invoked.</p>
+										</dd>
+										<dt>loggingenabled="[true|false]"</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Default: <code>false</code>
+											</p>
+											<p>This option enables logging within the mod_cfml valve. This is useful for determining if request header data is being passed to the Tomcat valve correctly, or if there are problems, it is useful for determining what those problems could be.</p>
+											<p>Logs are usually set to the "catalina.out" log on Linux systems, and for Windows Lucee/Railo installs to the "lucee-stdout" / "railo-stdout" log file.</p>
+										</dd>
+										<dt>maxContexts="200"</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <em>Integer</em><br>
+												Default: <code>200</code>
+											</p>
+											<p>The maxContexts value states how many web contexts may be created in Tomcat. Host aliases do not add up to this number, so an Apache VirtualHost with "Alias *.mydomain.com" will count as only 1 context in Tomcat.</p>
+											<p>The value should be a little bit higher then the total amount of configured websites in your frontend webserver.</p>
+											<p>If the maxContexts limit is reached, an error will be written to the Tomcat log files stating: <em>"[mod_cfml] MaxContexts limit reached. No more contexts can be created!"</em>, and a 503 (Service Unavailable) error will be returned for any new contexts, along with the error message on-screen.</p>
+										</dd>
+										<dt>timeBetweenContexts="2000"</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <em>Integer</em><br>
+												Default: <code>2000</code> (2 seconds)
+											</p>
+											<p>This value (stated in milliseconds) governs the context throttler, and sets the minimum time between the start of each context creation. Like the maxContexts value, this setting is specifically to help discourage certain kinds of Denial of Service attacks. The default setting of 2000 means "a maximum of 1 new website per 2 seconds may be added to Tomcat". In case of a server restart, the default setting may be uncomfortable for you if you have multiple high-traffic sites. In that case, you could change the setting to 0 (zero), which will prevent any errors going to end-users.</p>
+											<p>If you hit the limit enforced by the "timeBetweenContexts" value, an error will be written to the tomcat logs and a 503 (Service Unavailable) will be returned to the user. The error is specifically: <em>"[mod_cfml] Time Between Contexts has not been fulfilled. Please wait a few moments and try again."</em></p>
+										</dd>
+										<dt>scanClassPaths="true|false"</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <code>true</code> or <code>false</code><br>
+												Default: <code>false</code>
+											</p>
+											<p>TThis setting enables/disables the Tomcat Jar Scanner on each web context creation. This scan is the reason why web context creation in Tomcat seemed so slow, it takes multiple seconds to complete. For CFML engines, it is usually unnecessary to use it, and makes the web context loading 5 to 10 times faster.</p>
+											<p>If you are using Java/JSP pages in mod_cfml web contexts, or notice errors with jars which can not be found, then try setting this to True. If you are using Lucee or Railo, you might also be able to fix those errors by moving the missing jars to {web-context}/WEB-INF/lucee/lib/</p>
+										</dd>
+										<dt>sharedKey="secret key also set in the Apache/IIS config"</dt>
+										<dd>
+											<p><em>Required</em><br>
+												Values: <em>Alphanumeric</em><br>
+												Default: <em>null</em>
+											</p>
+											<p>To be sure any context-creating requests come from our frontend webserver, you can set up a shared secret key. We strongly advise you to implement this security measure, as context creation means exposing internal resources to the outside world.</p>
+											<p>It works really simple: when the valve is invoked, and the necessary X-Tomcat-DocRoot header is given, then we check if a sharedKey is set for the valve. If it is, then we check to see if it matches the value of the incoming request header X-ModCFML-SharedKey. If it does not match, or the incoming header does not exist, an error message "mod_cfml request authentication failed!" is logged, and a 503 error is returned, with the error-message on-screen.</p>
+											<p>While implementing this, you should first configure and restart your frontend webserver (Apache or IIS). After that, configure the Tomcat valve.</p>
+										</dd>
+									</dl>
+
+									<hr class="major" />
+
+									<h2>Frequently Asked Questions</h2>
+
+									<dl>
+										<dt>What is the mod_cfml Tomcat valve?</dt>
+										<dd>
+											<p>The mod_cfml Tomcat Valve is the part of the mod_cfml suite of software that dynamically creates hosts in Tomcat based on the request headers of the incoming request.</p>
+										</dd>
+										<dt>Does the mod_cfml Tomcat Valve check EVERY incoming request?</dt>
+										<dd>
+											<p>No. The suggested installation of the Valve is to install it in the default host of the Tomcat instance it's running in. Therefore, it only checks requests that get sent to the default host: hosts that don't exist yet and Tomcat doesn't know where else to send them.</p>
+										</dd>
+										<dt>How does the mod_cfml Tomcat Valve know when to add new hosts / aliases?</dt>
+										<dd>
+											<p>Incoming requests that are sent to Tomcat should contain at least one additional HTTP request header, the "X-Tomcat-DocRoot" header. This will be placed there by one of the mod_cfml web server components, either mod_cfml.so or the BonCode Connector).</p>
+											<p>Incoming requests that Tomcat doesn't know how to resolve get sent to the default host. In a default Tomcat installation, the default host is "localhost", so if Tomcat gets a request for www.yoursite.com, and doesn't know how to resolve that request, it will send it to "localhost". The mod_cfml Tomcat Valve takes advantage of this feature and uses it to catch any host that Tomcat doesn't know how to resolve.</p>
+											<p>The "magic" of the mod_cfml Tomcat Valve happens when Tomcat gets a request for www.yoursite.com, but that request gets sent to the default host because Tomcat doesn't know how to resolve it. Mod_cfml will see this "unknown host", and create a new host for it in Tomcat's memory while it's running.</p>
+											<p>If the request header "X-Webserver-Context" is also available, then the Tomcat valve will instead create a host with the header's value as a name (if it doesn't exist yet), and then add the current host as a host alias. This way, you can have one webserver context ("website"), with multiple hostnames, all running in the same Tomcat host context.</p>
+											<p>The Tomcat valve does this work by calling on the same libraries that the Tomcat "Host Manager" uses. So, realistically, mod_cfml uses pre-existing methods to make dynamically creating hosts in Tomcat very very easy.</p>
+										</dd>
+										<dt>Will there be a performance hit if I use the mod_cfml Tomcat Valve?</dt>
+										<dd>
+											<p>Yes, but ONLY on the first request for a new domain. The process of creating a new host entry in a running instance of Tomcat is somewhat complex, and requires many files to be written to the HDD to be read by Tomcat when the host is initialized. This process can take some time, depending on the speed of your drives and how busy they are. The average wait period for a new host context to be created is heavily dependent on the new setting "enableScanClassPaths". With enableScanClassPaths=false, the wait period is below 1 second; with enableScanClassPaths=true, it becomes around 3 to 5 seconds.</p>
+											<p>The wait time for a new host alias to be created is about 100 to 300 milliseconds.</p>
+											<p>If the request times out before the new host is created the request is passed to the default host and the default host site is displayed. HOWEVER, know that the host creation process threads are not killed even when the request times out. Instead, they continue and the host is eventually created. This means you can hit the "Refresh" button on your browser again and you will probably get your actual site rather then the default host. If this happens, you may increase the timeout limit for the initial request and mod_cfml will wait longer before timing out the request.</p>
+											<div class="box">
+												<p><span class="icon fa-exclamation-triangle"></span> IMPORTANT: After the host/alias is created, mod_cfml is no longer involved, so there is no performance loss after the first hit.</p>
+											</div>
+										</dd>
+										<dt>How can I remove or "re-install" a host that has been created wrong?</dt>
+										<dd>
+											<p>Accidents happen. Usually this just means that the host wasn't configured in the web server correctly before the config was copied to Tomcat. To clear out a host created in Tomcat with mod_cfml, go to the Tomcat Host Manager and remove the host. Mod_cfml will then create a new host entry whenever another request for that domain comes in.</p>
+											<p>Alternatively, you can restart Tomcat to clear out all dynamically created hosts.</p>
+										</dd>
+										<dt>How can I upgrade mod_cfml whenever there is an update?</dt>
+										<dd>
+											<p>To update the mod_cfml Tomcat Valve, just stop Tomcat for a moment, remove the mod_cfml valve JAR file from the {tomcat}/lib/ directory, and drop the latest version of the mod_cfml Tomcat Valve jar file into the Tomcat lib folder again. Restart Tomcat, and you're all set.</p>
+										</dd>
+									</dl>
+
+								</section>
+
+						</div>
+					</div>
+
+
+
+				<!-- Sidebar -->
+					<div id="sidebar">
+						<div class="inner">
+
+							<!-- Menu -->
+								<nav id="menu">
+									<header class="major">
+										<h2>Menu</h2>
+									</header>
+									<ul>
+										<li><a href="index.html">Homepage</a></li>
+										<li><a href="download.html">Download</a></li>
+										<li><span style="cursor: default; color: #7f888f">Documentation</span></li>
+										<li><a href="introduction.html">- Introduction</a></li>
+										<li><a href="docs-modcfml.html">- Apache mod_cfml.so</a></li>
+										<li><a href="docs-valve.html">- Tomcat Valve</a></li>
+										<li><span style="cursor: default; color: #7f888f">Installation</span></li>
+										<li><a href="install-nginx.html">- NGINX (all OS's)</a></li>
+										<li><a href="install-win-iis.html">- IIS on Windows</a></li>
+										<li><a href="install-win-apache.html">- Apache on Windows</a></li>
+										<li><a href="install-lin-centos.html">- Apache on CentOS</a></li>
+										<li><a href="install-lin-ubuntu.html">- Apache on Ubuntu</a></li>
+										<li><a href="install-valve-lin.html">- Tomcat Valve on Linux</a></li>
+										<li><a href="install-valve-win.html">- Tomcat Valve on Windows</a></li>
+										<li><a href="support.html">Support</a></li>
+									</ul>
+								</nav>
+
+							<!-- Footer -->
+								<footer id="footer">
+									<p class="copyright">&copy; <a href="https://viviotech.net/">Vivio Technologies Inc.</a> All rights reserved. Images: <a href="https://unsplash.com">Unsplash</a>. Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+								</footer>
+
+						</div>
+					</div>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/skel.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>

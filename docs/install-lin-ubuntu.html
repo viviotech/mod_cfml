@@ -1,0 +1,173 @@
+<!DOCTYPE HTML>
+<!--
+	Editorial by HTML5 UP
+	html5up.net | @ajlkn
+	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
+-->
+<html>
+	<head>
+		<title>mod_cfml - Installation - Apache on Centos</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<!--[if lte IE 8]><script src="assets/js/ie/html5shiv.js"></script><![endif]-->
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<!--[if lte IE 9]><link rel="stylesheet" href="assets/css/ie9.css" /><![endif]-->
+		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+	</head>
+	<body>
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Main -->
+					<div id="main">
+						<div class="inner">
+
+							<!-- Header -->
+								<header id="header">
+									<a href="index.html" class="logo"><strong>mod_cfml</strong> by Vivio Technologies</a>
+									<ul class="icons">
+										<li><a href="https://github.com/viviotech" class="icon fa-github"><span class="label">GitHub</span></a></li>
+										<li><a href="https://viviotech.net/" class="icon fa-home"><span class="label">Vivio Homepage</span></a></li>
+										<li><a href="https://twitter.com/viviotech" class="icon fa-twitter"><span class="label">Twitter</span></a></li>
+										<li><a href="https://www.facebook.com/viviotech/" class="icon fa-facebook"><span class="label">Facebook</span></a></li>
+									</ul>
+								</header>
+
+							<!-- Content -->
+								<section>
+									<header class="main">
+										<h1>Apache on Ubuntu</h1>
+									</header>
+
+									<h2>Install mod_cfml to Apache on Ubuntu</h2>
+
+									<p>The following steps cover all the processes necessary to be up and running with mod_cfml on Apache and Ubuntu/Mint/Debian. The steps are intended to be thorough, so you may not need to take each step on your own system. For example, you may already have Apache and some of the required modules installed on your system.</p>
+									<p>All steps provided are done from the command-line for uniformity. If you have a graphic desktop, you can perform these steps by opening a terminal window and running these commands.</p>
+
+									<h3>Installing Apache</h3>
+
+									<p>installing Apache on a Ubuntu system can be accomplished with the following commands:</p>
+
+									<pre><code>sudo apt-get install apache2 apache2-dev</code></pre>
+
+									<p>You'll get prompted for a password, then prompted for a confirmation to install. Accept both. Once Apache is installed, you can start Apache with the following:</p>
+
+									<pre><code>sudo service apache2 start</code></pre>
+
+									<h3>Installing mod_proxy</h3>
+
+									<p>Mod_proxy is a connector, that is, it passes the request off to Tomcat for processing. Both mod_proxy and mod_jk have been tested with mod_cfml and both work great. <strong>If you already have mod_proxy or mod_jk installed, then you may skip this step.</strong></p>
+									<p>You can install mod_proxy on Ubunu systems with this command:</p>
+
+									<pre><code>sudo apt-get install libapache2-mod-proxy-html</code></pre>
+
+									<p>Now enable the modules in Apache (turn them on):</p>
+
+									<pre><code>sudo a2enmod proxy proxy_html</code></pre>
+
+									<p>Next we need to configure the proxy to send the kind of requests we want off to Tomcat. You do that by editing this file:</p>
+
+									<pre><code>/etc/apache2/mods-available/proxy.conf</code></pre>
+
+									<p>...and adding the following <strong>INSIDE</strong> the &lt;ifmodule&gt;&lt;/ifmodule&gt; tags that probably already exist in the file (as well as a bunch of comments):</p>
+
+									<pre><code>&lt;Proxy *&gt;
+Allow from 127.0.0.1
+&lt;/Proxy&gt;
+ProxyPreserveHost On
+ProxyPassMatch ^/(.+\.cf[cm])(/.*)?$ ajp://localhost:8009/$1$2</code></pre>
+
+									<p>The config above is designed to send any request that Apache gets that has a &quot;.cfm&quot; or &quot;.cfc&quot; in it to be passed off to Tomcat. This configuration is obviously intended for CFML processing engines, but you can also use a statement similar to the above to pass &quot;.jsp&quot; files off to Tomcat, and mod_cfml will create contexts for those sites as well. Feel free to experiment here however you need to.</p>
+									<p>Now restart Apache so your changes take effect:</p>
+
+									<pre><code>sudo service apache2 restart</code></pre>
+
+									<p>Once that's done, requests to something like http://[server-ip]/index.cfm should be working for you.</p>
+
+									<pre><code>Installing mod_cfml</code></pre>
+
+									<p>Now, after all the preparation, we can finally install our mod_cfml module. If you haven't already, go <a href="https://github.com/utdream/mod_cfml/archive/master.zip">download the Github mod_cfml-master.zip</a> file. You can download the mod_cfml-master.zip file directly to the server you're installing it on using the &quot;wget&quot; command:</p>
+
+									<pre><code>wget -O mod_cfml-master.zip https://github.com/utdream/mod_cfml/archive/master.zip</code></pre>
+
+									<p>Next we need to unzip the file. You can do that using the &quot;unzip&quot; command:</p>
+
+									<pre><code>unzip mod_cfml-master.zip</code></pre>
+
+									<p>Now, go into the unzipped directory &quot;mod_cfml-master/C/&quot;, and use the Make program to compile mod_cfml.so, and add it into Apache's <em>modules</em> directory:</p>
+
+									<pre><code>cd ./mod_cfml-master/C
+sudo make
+sudo make install</code></pre>
+									<p>Now we add our mod_cfml config to Apache. Open this file:</p>
+
+									<pre><code>/etc/httpd/conf/httpd.conf</code></pre>
+
+									<p>... and add the following config to the very bottom of the file:</p>
+
+									<pre><code>LoadModule modcfml_module modules/mod_cfml.so
+CFMLHandlers &quot;.cfm .cfc .cfml&quot;
+ModCFML_SharedKey &quot;secret key also set in the Tomcat valve config&quot;
+# Optional, all for logging and debugging:
+# LogHeaders true
+# LogHandlers true
+# LogAliases true
+# VDirHeader false
+</code></pre>
+									<p>Again, note that this is configured for CFML requests. You can edit the &quot;CFMLHandlers&quot; value for the kinds of files that you're sending to Tomcat. (JSP or whatever). By default, mod_cfml will also update the headers on requests for default documents (any request ending in a slash: &quot;/&quot; ), so you don't need to worry about adding that as a handler.</p>
+
+								</section>
+
+						</div>
+					</div>
+
+
+
+				<!-- Sidebar -->
+					<div id="sidebar">
+						<div class="inner">
+
+							<!-- Menu -->
+								<nav id="menu">
+									<header class="major">
+										<h2>Menu</h2>
+									</header>
+									<ul>
+										<li><a href="index.html">Homepage</a></li>
+										<li><a href="download.html">Download</a></li>
+										<li><span style="cursor: default; color: #7f888f">Documentation</span></li>
+										<li><a href="introduction.html">- Introduction</a></li>
+										<li><a href="docs-modcfml.html">- Apache mod_cfml.so</a></li>
+										<li><a href="docs-valve.html">- Tomcat Valve</a></li>
+										<li><span style="cursor: default; color: #7f888f">Installation</span></li>
+										<li><a href="install-nginx.html">- NGINX (all OS's)</a></li>
+										<li><a href="install-win-iis.html">- IIS on Windows</a></li>
+										<li><a href="install-win-apache.html">- Apache on Windows</a></li>
+										<li><a href="install-lin-centos.html">- Apache on CentOS</a></li>
+										<li><a href="install-lin-ubuntu.html">- Apache on Ubuntu</a></li>
+										<li><a href="install-valve-lin.html">- Tomcat Valve on Linux</a></li>
+										<li><a href="install-valve-win.html">- Tomcat Valve on Windows</a></li>
+										<li><a href="support.html">Support</a></li>
+									</ul>
+								</nav>
+
+							<!-- Footer -->
+								<footer id="footer">
+									<p class="copyright">&copy; <a href="https://viviotech.net/">Vivio Technologies Inc.</a> All rights reserved. Images: <a href="https://unsplash.com">Unsplash</a>. Design: <a href="https://html5up.net">HTML5 UP</a>.</p>
+								</footer>
+
+						</div>
+					</div>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="assets/js/jquery.min.js"></script>
+			<script src="assets/js/skel.min.js"></script>
+			<script src="assets/js/util.js"></script>
+			<!--[if lte IE 8]><script src="assets/js/ie/respond.min.js"></script><![endif]-->
+			<script src="assets/js/main.js"></script>
+
+	</body>
+</html>
