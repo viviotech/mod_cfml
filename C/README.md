@@ -1,4 +1,4 @@
-#Compiling mod_cfml.so
+# Compiling mod_cfml.so
 
 There are quite a few compiled versions of mod_cfml.so:
 
@@ -9,7 +9,7 @@ There are quite a few compiled versions of mod_cfml.so:
 
 If you can't find a pre-compiled version at those locations, please follow the instructions underneath.
 
-##Compile for Mac and Linux
+## Compile for Mac and Linux
 
 1. Get the source code from github: https://github.com/utdream/mod_cfml/archive/master.zip
     and extract into eg. `~/Documents/` (_a sub-folder "mod_cfml-master" will be created_)
@@ -28,9 +28,9 @@ If you can't find a pre-compiled version at those locations, please follow the i
 
 4. The mod_cfml.so file can now be found in your Apache modules directory, by default at `/usr/libexec/apache2/mod_cfml.so`
 
-##Compile for Windows
+## Compile for Windows
 
-###Prerequisites
+### Prerequisites
 
 1.  Install Visual Studio.
     *Make sure the Visual Studio version matches the version with which your Apache version is compiled.*
