@@ -17,6 +17,8 @@
 #				Updated some optional debug output ("Incoming header" => "Request header", Alias output list starts with 1 instead of 0)
 # Rev. 1.1.07:	(Nov. 14, 2015) Added a version notice when this module starts up.
 #				note: Love to all French citizens who suffered in the terrorist attack yesterday. Unreal.
+# Rev. 1.1.08:	never released, but referenced in some git branch names, so skipping this version nr
+# Rev. 1.1.09:	(May 1, 2019) Only changed the Tomcat component
 #
 #				*** Don't forget to update the version nr. at modcfml_init_handler() when the Rev. nr. is updated! ***
 #
@@ -245,7 +247,7 @@ static int modcfml_init_handler(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *pte
 	}
 
 	ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-		"Thanks for using ModCFML, version 1.1.07");
+		"Thanks for using ModCFML, version 1.1.09");
     return OK;
 }
 
