@@ -10,14 +10,17 @@ package mod_cfml;
  * Home Page:
  * http://www.modcfml.org/
  * 
- * Version:  !!!!**** Update Version number in
- * 					  'private String versionNumber'
- * 					  as well *****!!!!!
+ * Version:
  * 1.1.01
  * 1.1.03: June 22, 2015, Paul Klinkenberg
  * 1.1.04: June 24, 2015, Paul Klinkenberg
  * 1.1.05: August 28, 2015, Paul Klinkenberg
- * 1.1.06: September 14, 2015, Pete Freitag 
+ * 1.1.06: September 14, 2015, Pete Freitag
+ * 1.1.07 / 1.1.08: never released, but referenced in some git branch names, so skipping those
+ * 1.1.09: May 1, 2019, Paul Klinkenberg (fixing broken 1.1.06 code; creating contexts thread-safe)
+ * 	!!!!**** Update Version number in
+ *			'private String versionNumber'
+ * 			as well *****!!!!!
  */
 
 // java
@@ -33,7 +36,6 @@ import java.lang.String;
 import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-// import java.text.SimpleDateFormat;
 
 // servlet
 import javax.servlet.ServletException;
@@ -53,7 +55,7 @@ import org.apache.catalina.LifecycleException;
 public class core extends ValveBase implements Serializable {
 
 
-	private String versionNumber = "1.1.06";
+	private String versionNumber = "1.1.09";
 
 
 	// declare configurable param defaults
@@ -63,16 +65,14 @@ public class core extends ValveBase implements Serializable {
 	private int maxContexts = 200;
 	private boolean scanClassPaths = false;
 	private String sharedKey = "";
+	private static String redirectKey = "_modcfmlredirected";
 
-	private static long lastContextTime;
-	private static int throttleValue;
-	private static Object lock;
-	synchronized {
-		lock = new Object();
-		lastContextTime = null;
-		throttleValue = 0;
-	}
-	
+	private static long lastContextTime = 0;
+	private static int throttleValue = 0;
+	private static final Object lockObject = new Object();
+
+	// for logging: give each request it's own number
+	private int requestNr = 0;
 
 	// methods for configurable params
 	public boolean getLoggingEnabled() {
@@ -139,12 +139,14 @@ public class core extends ValveBase implements Serializable {
 		String tcDocRoot;
 		String tcHost;
 		String tcMainHost;
+		int logNr;
 
-		if (initInternalCalled) {
-			if (loggingEnabled) {
+		synchronized (lockObject) {
+			logNr = ++requestNr;
+			if (loggingEnabled & initInternalCalled) {
+				initInternalCalled = false;
 				System.out.println("[mod_cfml] Counters have been reset (maxContexts, timeBetweenContexts)");
 			}
-			initInternalCalled = false;
 		}
 
 		// Get the DocRoot value from the HTTP header
@@ -165,7 +167,7 @@ public class core extends ValveBase implements Serializable {
 		if (sharedKey != null && !sharedKey.isEmpty()) {
 			String incomingKey = request.getHeader("X-ModCFML-SharedKey");
 			if (incomingKey == null || !incomingKey.equals(sharedKey)) {
-				handleError(503, "mod_cfml request authentication failed!", response);
+				handleError(503, "mod_cfml request authentication failed!", response, logNr);
 				return;
 			}
 		}
@@ -216,15 +218,16 @@ public class core extends ValveBase implements Serializable {
 
 		// logging for debugging purposes
 		if (loggingEnabled) {
-			System.out.println("[mod_cfml] Decoded Request URI => " + tcURI);
-			System.out.println("[mod_cfml] QueryString => " + tcURIParams);
-			System.out.println("[mod_cfml] DocRoot Value => " + tcDocRoot);
+			String logData = "[mod_cfml]["+logNr+"] Decoded Request URI => " + tcURI
+					+ "\n[mod_cfml]["+logNr+"] QueryString => " + tcURIParams
+					+ "\n[mod_cfml]["+logNr+"] DocRoot Value => " + tcDocRoot;
 			if (!tcMainHost.equals(tcHost)) {
-				System.out.println("[mod_cfml] Webserver main Host => " + tcMainHost);
-				System.out.println("[mod_cfml] Alias Value => " + tcHost);
+				logData += "\n[mod_cfml]["+logNr+"] Webserver main Host => " + tcMainHost
+						+ "\n[mod_cfml]["+logNr+"] Alias Value => " + tcHost;
 			} else {
-				System.out.println("[mod_cfml] Host Value => " + tcHost);
+				logData += "\n[mod_cfml]["+logNr+"] Host Value => " + tcHost;
 			}
+			System.out.println(logData);
 		}
 
 		// get system vars
@@ -233,12 +236,21 @@ public class core extends ValveBase implements Serializable {
 
 		// see if the host already exists
 		if (engine.findChild(tcHost) != null) {
-			// host already exist? Skip this Valve.
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] FATAL: Host [" + tcHost + "] already exists.");
+			// This situation can occur in a race condition, when multiple requests come in for the same context.
+			// We test this by redirecting the user with an extra query parameter. If we find the query parameter as
+			// an incoming value, we know something is wrong. Otherwise, it was indeed a race condition.
+			if (tcURIParams != null && tcURIParams.indexOf(redirectKey) > -1) {
+				// host already exist? Skip this Valve.
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml]["+logNr+"] FATAL: Host [" + tcHost + "] already exists, but new requests still land at the localhost host.");
+				}
+				getNext().invoke(request, response);
+				return;
+			} else {
+				doRedirect(tcURI, tcURIParams, response, loggingEnabled, logNr);
+				return;
 			}
-			getNext().invoke(request, response);
-			return;
+
 		}
 
 		// set base variables for tcDocRoot file system check
@@ -248,7 +260,7 @@ public class core extends ValveBase implements Serializable {
 		if (!tcDocRootFile.isDirectory()) {
 			// log the invalid directory if we have logging on
 			if (loggingEnabled) {
-				System.out.println("[mod_cfml] FATAL: DocRoot value [" + tcDocRoot + "] failed isDirectory() check. Directory may not exist, or Tomcat may not have permission to check it.");
+				System.out.println("[mod_cfml]["+logNr+"] FATAL: DocRoot value [" + tcDocRoot + "] failed isDirectory() check. Directory may not exist, or Tomcat may not have permission to check it.");
 			}
 			getNext().invoke(request, response);
 			return;
@@ -262,13 +274,13 @@ public class core extends ValveBase implements Serializable {
 // BEGIN Throttling
 		
 		if (!addAsAlias) {
-			Date newNow = new Date();
 			String errorMessage = null;
-			// verify timeBetweenContexts
-			synchronized(lock) {
-				if (lastContextTime != null) {
+			synchronized(lockObject) {
+				Date newNow = new Date();
+				// verify timeBetweenContexts
+				if (lastContextTime != 0) {
 					// if it's not null, ensure we've waited our timeBetweenContexts
-					if (lastContextTime + timeBetweenContexts) > newNow.getTime()) {
+					if ((lastContextTime + timeBetweenContexts) > newNow.getTime()) {
 						// if enough time hasn't passed yet, send a "wait" response
 						errorMessage = "Time Between Contexts has not been fulfilled. Please wait a few moments and try again.";
 					}
@@ -287,7 +299,7 @@ public class core extends ValveBase implements Serializable {
 			}
 
 			if (errorMessage != null) {
-				handleError(503, errorMessage, response);
+				handleError(503, errorMessage, response, logNr);
 				return;
 			}
 		}
@@ -302,177 +314,197 @@ public class core extends ValveBase implements Serializable {
 			if (engine.findChild(tcMainHost) != null) {
 				Container child = engine.findChild(tcMainHost);
 				if (!(child instanceof StandardHost)) {
-					System.out.println("[mod_cfml] FATAL: The Tomcat Host [" + tcMainHost + "], parent for host-alias [" + tcHost + "], is not an instance of StandardHost! (type: " + child.getClass().getName() + ")");
+					System.out.println("[mod_cfml]["+logNr+"] FATAL: The Tomcat Host [" + tcMainHost + "], parent for host-alias [" + tcHost + "], is not an instance of StandardHost! (type: " + child.getClass().getName() + ")");
 					getNext().invoke(request, response);
 					return;
 				}
 				if (loggingEnabled) {
-					System.out.println("[mod_cfml] Adding host alias [" + tcHost + "] to existing Host [" + tcMainHost + "]");
+					System.out.println("[mod_cfml]["+logNr+"] Adding host alias [" + tcHost + "] to existing Host [" + tcMainHost + "]");
 				}
 				host = (StandardHost) child;
 				host.addAlias(tcHost);
 				addAsAlias = true;
+				// ToDo PK: test if we can do the redirect here already, to get the user to the newly added alias site.
+				// Underneath, we're only re-adding the context files.
+				// Because "engine.findChild(tcMainHost) != null", the main-host already exists in config somewhere.
 			}
 		}
 
+		boolean errorFound = false;
+
+		synchronized(lockObject) {
+			// Because the context-creation is locked with "synchronized", we might have waited for another thread
+			// which created the same context just now... Check this!
+			if (engine.findChild(tcHost) != null) {
+				// host already exists!
+				if (loggingEnabled) {
+					System.out.println("[mod_cfml]["+logNr+"] Web context for [" + tcHost + "] has been created meanwhile.");
+				}
+			} else {
 // STEP 2 - Check/Create the XML config and work directories
-		// set the config directory value
-		String newHostConfDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/conf/Catalina/" + tcMainHost;
-		File newHostConfDirFile = null;
-		file = new File(newHostConfDir);
-		newHostConfDirFile = file.getCanonicalFile();
+				// set the config directory value
+				String newHostConfDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/conf/Catalina/" + tcMainHost;
+				File newHostConfDirFile = null;
+				file = new File(newHostConfDir);
+				newHostConfDirFile = file.getCanonicalFile();
 
-		// see if the directory exists already
-		if (!newHostConfDirFile.isDirectory()) {
-			// if it doesn't exist, create it
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Creating new config directory: " + newHostConfDirFile);
-			}
-			file.mkdir();
-		} else if (addAsAlias == false) {
-			// if it does exist, remove it (and everything under it)
-			// because it's from an old config
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Removing old config directory: " + newHostConfDirFile);
-			}
-			deleteDir(file);
-			// now make the directory again so we start with a clean slate
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Creating new config directory: " + newHostConfDirFile);
-			}
-			file.mkdir();
-		}
+				// see if the directory exists already
+				if (!newHostConfDirFile.isDirectory()) {
+					// if it doesn't exist, create it
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml]["+logNr+"] Creating new config directory: " + newHostConfDirFile);
+					}
+					file.mkdir();
+				} else if (addAsAlias == false) {
+					// if it does exist, remove it (and everything under it)
+					// because it's from an old config
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml]["+logNr+"] Removing old config directory: " + newHostConfDirFile);
+					}
+					deleteDir(file);
+					// now make the directory again so we start with a clean slate
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml]["+logNr+"] Creating new config directory: " + newHostConfDirFile);
+					}
+					file.mkdir();
+				}
 
-		// set the work directory value
-		String newHostWorkDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/work/Catalina/" + tcMainHost;
+				// set the work directory value
+				String newHostWorkDir = System.getProperty(Globals.CATALINA_BASE_PROP) + "/work/Catalina/" + tcMainHost;
 
-		File newHostWorkDirFile = null;
-		file = new File(newHostWorkDir);
-		newHostWorkDirFile = file.getCanonicalFile();
+				File newHostWorkDirFile = null;
+				file = new File(newHostWorkDir);
+				newHostWorkDirFile = file.getCanonicalFile();
 
-		// see if the directory exists already
-		if (!newHostWorkDirFile.isDirectory()) {
-			// if it doesn't exist, ignore it
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Work directory doesn't exist: " + newHostWorkDirFile);
-			}
-		} else if (addAsAlias == false) {
-			// if it does exist, remove it (and everything under it)
-			// because it's from an old config
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Removing old work directory: " + newHostWorkDirFile);
-			}
-			deleteDir(file);
-		}
+				// see if the directory exists already
+				if (!newHostWorkDirFile.isDirectory()) {
+					// if it doesn't exist, ignore it
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml]["+logNr+"] Work directory doesn't exist: " + newHostWorkDirFile);
+					}
+				} else if (addAsAlias == false) {
+					// if it does exist, remove it (and everything under it)
+					// because it's from an old config
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml]["+logNr+"] Removing old work directory: " + newHostWorkDirFile);
+					}
+					deleteDir(file);
+				}
 
 // STEP 3 - Write the context XML config
-		String newHostConfFile = newHostConfDirFile + "/ROOT.xml";
-		file = new File(newHostConfFile);
-		if (!file.exists()) {
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Creating context file: " + newHostConfFile);
-			}
-			PrintWriter out = new PrintWriter(new FileOutputStream(file));
-			out.println("<?xml version='1.0' encoding='utf-8'?>");
-			out.println("<Context docBase=\"" + tcDocRoot + "\">");
-			out.println("  <WatchedResource>WEB-INF/web.xml</WatchedResource>");
-			// the following line is THE difference between slow and fast Context loading. (eg. 3,000 ms vs 150 ms.)
-			if (!scanClassPaths) {
-				out.println("  <JarScanner scanClassPath=\"false\" />");
-			}
-			out.println("</Context>");
-			out.flush(); // write to the file
-			out.close(); // close out the file
-		}
+				String newHostConfFile = newHostConfDirFile + "/ROOT.xml";
+				file = new File(newHostConfFile);
+				if (!file.exists()) {
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml]["+logNr+"] Creating context file: " + newHostConfFile);
+					}
+					PrintWriter out = new PrintWriter(new FileOutputStream(file));
+					out.println("<?xml version='1.0' encoding='utf-8'?>");
+					out.println("<Context docBase=\"" + tcDocRoot + "\">");
+					out.println("  <WatchedResource>WEB-INF/web.xml</WatchedResource>");
+					// the following line is THE difference between slow and fast Context loading. (eg. 3,000 ms vs 150 ms.)
+					if (!scanClassPaths) {
+						out.println("  <JarScanner scanClassPath=\"false\" />");
+					}
+					out.println("</Context>");
+					out.flush(); // write to the file
+					out.close(); // close out the file
+				}
 
 // STEP 4 - Create the context
-		if (addAsAlias == false) {
-			host = new StandardHost();
-			// log it
-			if (loggingEnabled) {
-				System.out.println("[mod_cfml] Creating New Host... ");
-				// System.out.println("setAppBase Value => " + tcDocRootFile.toString());
-				System.out.println("[mod_cfml] setName Value => " + tcMainHost);
-			}
-			host.addLifecycleListener(new HostConfig());
-			host.setAppBase("webapps");
-			// host.setAppBase(tcDocRootFile.toString());
-			host.setName(tcMainHost);
-			host.setAutoDeploy(true);
-			host.setDeployOnStartup(true);
-			host.setDeployXML(true);
-			if (!tcHost.equals(tcMainHost)) {
-				host.addAlias(tcHost);
-			}
-			// make it
-			try {
-				engine.addChild(host);
-			} catch (Exception e) {
-				System.out.println("[mod_cfml] ERROR: " + e.toString());
-				return;
-			}
-		}
+				if (addAsAlias == false) {
+					host = new StandardHost();
+					// log it
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml]["+logNr+"] Creating New Host... ");
+						// System.out.println("setAppBase Value => " + tcDocRootFile.toString());
+						System.out.println("[mod_cfml]["+logNr+"] setName Value => " + tcMainHost);
+					}
+					host.addLifecycleListener(new HostConfig());
+					host.setAppBase("webapps");
+					// host.setAppBase(tcDocRootFile.toString());
+					host.setName(tcMainHost);
+					host.setAutoDeploy(true);
+					host.setDeployOnStartup(true);
+					host.setDeployXML(true);
+					if (!tcHost.equals(tcMainHost)) {
+						host.addAlias(tcHost);
+					}
+					// make it
+					try {
+						engine.addChild(host);
+					} catch (Exception e) {
+						System.out.println("[mod_cfml]["+logNr+"] ERROR: " + e.toString());
+						errorFound = true;
+					}
+				}
 
 // STEP 5 - ensure the context config files and work directory exist
-		if (loggingEnabled) {
-			System.out.println("[mod_cfml] Verifying context files...");
-		}
-		boolean _found = false;
-		File tcContextXMLFile = null;
-		File tcContextXMLFilePointer = null;
+				if (!errorFound) {
+					if (loggingEnabled) {
+						System.out.println("[mod_cfml]["+logNr+"] Verifying context files...");
+					}
+					boolean _found = false;
+					File tcContextXMLFile = null;
+					File tcContextXMLFilePointer = null;
 
-		tcContextXMLFilePointer = new File(newHostConfFile);
-		tcContextXMLFile = tcContextXMLFilePointer.getCanonicalFile();
-		// wait for the specified number of seconds
-		for (int i = 0; i <= waitForContext; i++) {
-			// check to see if the directory exists
-			if (newHostConfDirFile.isDirectory()) {
-				// if it exists, check the file too
-				if (tcContextXMLFile.isFile()) {
-					// if the dir and file exist, check for the work directory
-					if (newHostWorkDirFile.isDirectory()) {
-						// if the work directory exists, end this loop
-						_found = true;
-						break;
+					tcContextXMLFilePointer = new File(newHostConfFile);
+					tcContextXMLFile = tcContextXMLFilePointer.getCanonicalFile();
+					// wait for the specified number of seconds
+					for (int i = 0; i <= waitForContext*10; i++) {
+						// check to see if the directory exists
+						if (newHostConfDirFile.isDirectory()) {
+							// if it exists, check the file too
+							if (tcContextXMLFile.isFile()) {
+								// if the dir and file exist, check for the work directory
+								if (newHostWorkDirFile.isDirectory()) {
+									// if the work directory exists, end this loop
+									_found = true;
+									break;
+								}
+							}
+						}
+						if (waitForContext > i) {
+							if (loggingEnabled) {
+								System.out.println("[mod_cfml]["+logNr+"] Context files do not yet exist! Will check again after 0.1 second... (" + ((i + 1)/10) + ")");
+							}
+							try {
+								Thread.sleep(100);
+							} catch (InterruptedException e) {
+							}
+						} else {
+							if (loggingEnabled) {
+								System.out.println("[mod_cfml]["+logNr+"] ERROR: Context files do not exist! Will continue, but likely to result in error.");
+							}
+						}
+					}
+
+// STEP 6 - remember the amount of created contexts
+					if (!addAsAlias) {
+						throttleValue += 1;
 					}
 				}
 			}
-			if (waitForContext > i) {
-				if (loggingEnabled) {
-					System.out.println("[mod_cfml] Context files do not yet exist! Will check again after 1 second... (" + (i + 1) + ")");
-				}
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-				}
-			} else {
-				if (loggingEnabled) {
-					System.out.println("[mod_cfml] ERROR: Context files do not exist! Will continue, but likely to result in error.");
-				}
-			}
-		}
-
-// STEP 6 - record the times and serialize our data
-		if (!addAsAlias) {
-			// add 1 to our throttleValue, if we added a new Host
-			int numContexts = Integer.parseInt(contextRecord[2]);
-			numContexts++;
-			synchronized(lock) {
-				throttleValue = numContexts;	
-			}			
 		}
 
 // STEP 7 - call ourselves again so we bypass localhost
-		String tcRedirectURL;
-		if (tcURIParams != null && tcURIParams.length() > 0) {
-			// if there are URI params, pass them
-			tcRedirectURL = tcURI + "?" + tcURIParams;
-		} else {
-			tcRedirectURL = tcURI;
+		doRedirect(tcURI, tcURIParams, response, loggingEnabled, logNr);
+	}
+
+
+	public static void doRedirect(String uri, String params, Response response, boolean loggingEnabled, int logNr)
+			throws IOException {
+		if (params == null) {
+			params = "";
+		}
+		if (params.indexOf(redirectKey) == -1) {
+			params += "&" + redirectKey;
 		}
 
+		String tcRedirectURL = uri + "?" + params;
+
 		if (loggingEnabled) {
-			System.out.println("[mod_cfml] Redirect URL => '" + tcRedirectURL + "'");
+			System.out.println("[mod_cfml]["+logNr+"] Redirect URL => '" + tcRedirectURL + "'");
 		}
 
 		response.sendRedirect(response.encodeRedirectUrl(tcRedirectURL));
@@ -496,8 +528,8 @@ public class core extends ValveBase implements Serializable {
 		return dir.delete();
 	}
 
-	public static void handleError(int statuscode, String msg, Response response) throws ServletException, IOException {
-		System.out.println("[mod_cfml] ERROR (sent to client): " + statuscode + ": " + msg);
+	public static void handleError(int statuscode, String msg, Response response, int logNr) throws ServletException, IOException {
+		System.out.println("[mod_cfml]["+logNr+"] ERROR (sent to client): " + statuscode + ": " + msg);
 		response.setContentType("text/html");
 		response.getWriter().write("<h3>Tomcat Mod_CFML error</h3><p>" + msg + "</p>");
 		response.setStatus(statuscode);
