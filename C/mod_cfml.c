@@ -1,6 +1,6 @@
 ﻿/* ##############################################################################
 # package:		mod_cfml.c
-# version:		1.1.07
+# version:		see revisions underneath
 # author:		Paul Klinkenberg (paul@lucee.nl)
 # website:		http://www.modcfml.org/  ||  http://www.lucee.nl/
 # license:		LGPL 3.0; see http://www.opensource.org/licenses/lgpl-3.0.html
@@ -19,6 +19,7 @@
 #				note: Love to all French citizens who suffered in the terrorist attack yesterday. Unreal.
 # Rev. 1.1.08:	never released, but referenced in some git branch names, so skipping this version nr
 # Rev. 1.1.09:	(May 1, 2019) Only changed the Tomcat component
+# Rev. 1.1.10:	(June 5, 2019) Only changed the Tomcat component
 #
 #				*** Don't forget to update the version nr. at modcfml_init_handler() when the Rev. nr. is updated! ***
 #
@@ -247,7 +248,7 @@ static int modcfml_init_handler(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *pte
 	}
 
 	ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-		"Thanks for using ModCFML, version 1.1.09");
+		"Thanks for using ModCFML, version 1.1.10");
     return OK;
 }
 

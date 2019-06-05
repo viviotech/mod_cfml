@@ -18,6 +18,7 @@ package mod_cfml;
  * 1.1.06: September 14, 2015, Pete Freitag
  * 1.1.07 / 1.1.08: never released, but referenced in some git branch names, so skipping those
  * 1.1.09: May 1, 2019, Paul Klinkenberg (fixing broken 1.1.06 code; creating contexts thread-safe)
+ * 1.1.10: June 5, 2019, Paul Klinkenberg (#24; improved redirect loop detection procedure: only add querystring param when necessary)
  * 	!!!!**** Update Version number in
  *			'private String versionNumber'
  * 			as well *****!!!!!
@@ -55,7 +56,7 @@ import org.apache.catalina.LifecycleException;
 public class core extends ValveBase implements Serializable {
 
 
-	private String versionNumber = "1.1.09";
+	private String versionNumber = "1.1.10";
 
 
 	// declare configurable param defaults
@@ -65,7 +66,7 @@ public class core extends ValveBase implements Serializable {
 	private int maxContexts = 200;
 	private boolean scanClassPaths = false;
 	private String sharedKey = "";
-	private static String redirectKey = "_modcfmlredirected";
+	private static String redirectKey = "__";
 
 	private static long lastContextTime = 0;
 	private static int throttleValue = 0;
@@ -121,6 +122,14 @@ public class core extends ValveBase implements Serializable {
 
 	public void setSharedKey(String sharedKey) {
 		this.sharedKey = sharedKey;
+	}
+
+	public String getRedirectKey() {
+		return redirectKey;
+	}
+
+	public void setRedirectKey(String redirectKey) {
+		this.redirectKey = redirectKey;
 	}
 
 	public boolean initInternalCalled = false;
@@ -237,16 +246,31 @@ public class core extends ValveBase implements Serializable {
 		// see if the host already exists
 		if (engine.findChild(tcHost) != null) {
 			// This situation can occur in a race condition, when multiple requests come in for the same context.
-			// We test this by redirecting the user with an extra query parameter. If we find the query parameter as
-			// an incoming value, we know something is wrong. Otherwise, it was indeed a race condition.
-			if (tcURIParams != null && tcURIParams.indexOf(redirectKey) > -1) {
+			// It is also weirdly possible that the user came back here, after our config changes and previous redirect,
+			// meaning the setup did not work as expected.
+			// We do a redirect to try again, but also try to catch eternal redirects here, by adding a url parameter.
+			if (tcURIParams != null && tcURIParams.length() > redirectKey.length()
+					&& tcURIParams.substring(tcURIParams.length() - 1 - redirectKey.length()) == "&"+redirectKey) {
+				String msg = "Host [" + tcHost + "] already exists, but new requests still land at the localhost host.";
 				// host already exist? Skip this Valve.
 				if (loggingEnabled) {
-					System.out.println("[mod_cfml]["+logNr+"] FATAL: Host [" + tcHost + "] already exists, but new requests still land at the localhost host.");
+					System.out.println("[mod_cfml]["+logNr+"] FATAL: "+msg);
 				}
-				getNext().invoke(request, response);
+				handleError(508, msg, response, logNr);// 508: Loop Detected
 				return;
 			} else {
+				// add uri param
+				if (tcURIParams == null) {
+					tcURIParams = "";
+				}
+				tcURIParams += "&"+redirectKey;
+				// wait a sec, for the context to fully come alive
+				try {
+					Thread.sleep(500);
+				} catch(InterruptedException e) {
+					// too bad
+				}
+				// now redirect
 				doRedirect(tcURI, tcURIParams, response, loggingEnabled, logNr);
 				return;
 			}
@@ -497,10 +521,6 @@ public class core extends ValveBase implements Serializable {
 		if (params == null) {
 			params = "";
 		}
-		if (params.indexOf(redirectKey) == -1) {
-			params += "&" + redirectKey;
-		}
-
 		String tcRedirectURL = uri + "?" + params;
 
 		if (loggingEnabled) {
