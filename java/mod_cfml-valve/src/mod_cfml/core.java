@@ -18,6 +18,7 @@ package mod_cfml;
  * 1.1.06: September 14, 2015, Pete Freitag
  * 1.1.07 / 1.1.08: never released, but referenced in some git branch names, so skipping those
  * 1.1.09: May 1, 2019, Paul Klinkenberg (fixing broken 1.1.06 code; creating contexts thread-safe)
+ * 1.1.10: June 5, 2019, Paul Klinkenberg (#24; improved redirect loop detection procedure: only add querystring param when necessary)
  * 	!!!!**** Update Version number in
  *			'private String versionNumber'
  * 			as well *****!!!!!
@@ -55,7 +56,7 @@ import org.apache.catalina.LifecycleException;
 public class core extends ValveBase implements Serializable {
 
 
-	private String versionNumber = "1.1.09";
+	private String versionNumber = "1.1.10";
 
 
 	// declare configurable param defaults
