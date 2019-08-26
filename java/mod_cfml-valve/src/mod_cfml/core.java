@@ -19,6 +19,7 @@ package mod_cfml;
  * 1.1.07 / 1.1.08: never released, but referenced in some git branch names, so skipping those
  * 1.1.09: May 1, 2019, Paul Klinkenberg (fixing broken 1.1.06 code; creating contexts thread-safe)
  * 1.1.10: June 5, 2019, Paul Klinkenberg (#24; improved redirect loop detection procedure: only add querystring param when necessary)
+ * 1.1.11: August 26, 2019, Jordan Michaels - added redirect code option
  * 	!!!!**** Update Version number in
  *			'private String versionNumber'
  * 			as well *****!!!!!
@@ -30,10 +31,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Serializable;
 import java.io.FileOutputStream;
-import java.io.ObjectOutputStream;
-import java.io.FileInputStream;
-import java.io.ObjectInputStream;
-import java.lang.String;
+//import java.io.ObjectOutputStream;
+//import java.io.FileInputStream;
+//import java.io.ObjectInputStream;
+//import java.lang.String;
 import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,7 +57,7 @@ import org.apache.catalina.LifecycleException;
 public class core extends ValveBase implements Serializable {
 
 
-	private String versionNumber = "1.1.10";
+	private String versionNumber = "1.1.11";
 
 
 	// declare configurable param defaults
@@ -66,6 +67,7 @@ public class core extends ValveBase implements Serializable {
 	private int maxContexts = 200;
 	private boolean scanClassPaths = false;
 	private String sharedKey = "";
+	private int responseCode = 302;
 	private static String redirectKey = "__";
 
 	private static long lastContextTime = 0;
@@ -123,6 +125,14 @@ public class core extends ValveBase implements Serializable {
 	public void setSharedKey(String sharedKey) {
 		this.sharedKey = sharedKey;
 	}
+        
+	public int getResponseCode() {
+		return (responseCode);
+	}
+
+	public void setResponseCode(int responseCode) {
+		this.responseCode = responseCode;
+	}
 
 	public String getRedirectKey() {
 		return redirectKey;
@@ -138,7 +148,7 @@ public class core extends ValveBase implements Serializable {
 		super.initInternal();
 		initInternalCalled = true;
 
-		System.out.println("[mod_cfml] Starting mod_cfml version: " + versionNumber);
+		System.out.println("[mod_cfml] INFO: Starting mod_cfml version: " + versionNumber);
 
 		
 	}
@@ -154,7 +164,7 @@ public class core extends ValveBase implements Serializable {
 			logNr = ++requestNr;
 			if (loggingEnabled & initInternalCalled) {
 				initInternalCalled = false;
-				System.out.println("[mod_cfml] Counters have been reset (maxContexts, timeBetweenContexts)");
+				System.out.println("[mod_cfml] INFO: Counters have been reset (maxContexts, timeBetweenContexts)");
 			}
 		}
 
@@ -179,6 +189,17 @@ public class core extends ValveBase implements Serializable {
 				handleError(503, "mod_cfml request authentication failed!", response, logNr);
 				return;
 			}
+		}
+                
+                // verify response code
+                // only going to allow 301 to 308 for our purposes
+                if ((responseCode < 301) || (responseCode > 308)) {
+			// bad response code, set to default 302
+			if (loggingEnabled) {
+				System.out.println("[mod_cfml] WARN: Invalid response code provided. Defaulting to 302.");
+			}
+			this.responseCode = 302;
+			return;
 		}
 
 		// Get the Host name value from the HTTP header
@@ -271,7 +292,7 @@ public class core extends ValveBase implements Serializable {
 					// too bad
 				}
 				// now redirect
-				doRedirect(tcURI, tcURIParams, response, loggingEnabled, logNr);
+				doRedirect(tcURI, tcURIParams, response, loggingEnabled, logNr, responseCode);
 				return;
 			}
 
@@ -343,7 +364,7 @@ public class core extends ValveBase implements Serializable {
 					return;
 				}
 				if (loggingEnabled) {
-					System.out.println("[mod_cfml]["+logNr+"] Adding host alias [" + tcHost + "] to existing Host [" + tcMainHost + "]");
+					System.out.println("[mod_cfml]["+logNr+"] INFO: Adding host alias [" + tcHost + "] to existing Host [" + tcMainHost + "]");
 				}
 				host = (StandardHost) child;
 				host.addAlias(tcHost);
@@ -362,7 +383,7 @@ public class core extends ValveBase implements Serializable {
 			if (engine.findChild(tcHost) != null) {
 				// host already exists!
 				if (loggingEnabled) {
-					System.out.println("[mod_cfml]["+logNr+"] Web context for [" + tcHost + "] has been created meanwhile.");
+					System.out.println("[mod_cfml]["+logNr+"] INFO: Web context for [" + tcHost + "] has been created meanwhile.");
 				}
 			} else {
 // STEP 2 - Check/Create the XML config and work directories
@@ -376,19 +397,19 @@ public class core extends ValveBase implements Serializable {
 				if (!newHostConfDirFile.isDirectory()) {
 					// if it doesn't exist, create it
 					if (loggingEnabled) {
-						System.out.println("[mod_cfml]["+logNr+"] Creating new config directory: " + newHostConfDirFile);
+						System.out.println("[mod_cfml]["+logNr+"] INFO: Creating new config directory: " + newHostConfDirFile);
 					}
 					file.mkdir();
 				} else if (addAsAlias == false) {
 					// if it does exist, remove it (and everything under it)
 					// because it's from an old config
 					if (loggingEnabled) {
-						System.out.println("[mod_cfml]["+logNr+"] Removing old config directory: " + newHostConfDirFile);
+						System.out.println("[mod_cfml]["+logNr+"] INFO: Removing old config directory: " + newHostConfDirFile);
 					}
 					deleteDir(file);
 					// now make the directory again so we start with a clean slate
 					if (loggingEnabled) {
-						System.out.println("[mod_cfml]["+logNr+"] Creating new config directory: " + newHostConfDirFile);
+						System.out.println("[mod_cfml]["+logNr+"] INFO: Creating new config directory: " + newHostConfDirFile);
 					}
 					file.mkdir();
 				}
@@ -404,13 +425,13 @@ public class core extends ValveBase implements Serializable {
 				if (!newHostWorkDirFile.isDirectory()) {
 					// if it doesn't exist, ignore it
 					if (loggingEnabled) {
-						System.out.println("[mod_cfml]["+logNr+"] Work directory doesn't exist: " + newHostWorkDirFile);
+						System.out.println("[mod_cfml]["+logNr+"] INFO: Work directory doesn't exist: " + newHostWorkDirFile);
 					}
 				} else if (addAsAlias == false) {
 					// if it does exist, remove it (and everything under it)
 					// because it's from an old config
 					if (loggingEnabled) {
-						System.out.println("[mod_cfml]["+logNr+"] Removing old work directory: " + newHostWorkDirFile);
+						System.out.println("[mod_cfml]["+logNr+"] INFO: Removing old work directory: " + newHostWorkDirFile);
 					}
 					deleteDir(file);
 				}
@@ -420,7 +441,7 @@ public class core extends ValveBase implements Serializable {
 				file = new File(newHostConfFile);
 				if (!file.exists()) {
 					if (loggingEnabled) {
-						System.out.println("[mod_cfml]["+logNr+"] Creating context file: " + newHostConfFile);
+						System.out.println("[mod_cfml]["+logNr+"] INFO: Creating context file: " + newHostConfFile);
 					}
 					PrintWriter out = new PrintWriter(new FileOutputStream(file));
 					out.println("<?xml version='1.0' encoding='utf-8'?>");
@@ -440,9 +461,9 @@ public class core extends ValveBase implements Serializable {
 					host = new StandardHost();
 					// log it
 					if (loggingEnabled) {
-						System.out.println("[mod_cfml]["+logNr+"] Creating New Host... ");
+						System.out.println("[mod_cfml]["+logNr+"] INFO: Creating New Host... ");
 						// System.out.println("setAppBase Value => " + tcDocRootFile.toString());
-						System.out.println("[mod_cfml]["+logNr+"] setName Value => " + tcMainHost);
+						System.out.println("[mod_cfml]["+logNr+"] INFO: setName Value => " + tcMainHost);
 					}
 					host.addLifecycleListener(new HostConfig());
 					host.setAppBase("webapps");
@@ -466,7 +487,7 @@ public class core extends ValveBase implements Serializable {
 // STEP 5 - ensure the context config files and work directory exist
 				if (!errorFound) {
 					if (loggingEnabled) {
-						System.out.println("[mod_cfml]["+logNr+"] Verifying context files...");
+						System.out.println("[mod_cfml]["+logNr+"] INFO: Verifying context files...");
 					}
 					boolean _found = false;
 					File tcContextXMLFile = null;
@@ -490,7 +511,7 @@ public class core extends ValveBase implements Serializable {
 						}
 						if (waitForContext > i) {
 							if (loggingEnabled) {
-								System.out.println("[mod_cfml]["+logNr+"] Context files do not yet exist! Will check again after 0.1 second... (" + ((i + 1)/10) + ")");
+								System.out.println("[mod_cfml]["+logNr+"] INFO: Context files do not yet exist! Will check again after 0.1 second... (" + ((i + 1)/10) + ")");
 							}
 							try {
 								Thread.sleep(100);
@@ -512,11 +533,11 @@ public class core extends ValveBase implements Serializable {
 		}
 
 // STEP 7 - call ourselves again so we bypass localhost
-		doRedirect(tcURI, tcURIParams, response, loggingEnabled, logNr);
+		doRedirect(tcURI, tcURIParams, response, loggingEnabled, logNr, responseCode);
 	}
 
 
-	public static void doRedirect(String uri, String params, Response response, boolean loggingEnabled, int logNr)
+	public static void doRedirect(String uri, String params, Response response, boolean loggingEnabled, int logNr, int responseCode)
 			throws IOException {
 		if (params == null) {
 			params = "";
@@ -524,10 +545,10 @@ public class core extends ValveBase implements Serializable {
 		String tcRedirectURL = uri + "?" + params;
 
 		if (loggingEnabled) {
-			System.out.println("[mod_cfml]["+logNr+"] Redirect URL => '" + tcRedirectURL + "'");
+			System.out.println("[mod_cfml]["+logNr+"] INFO: Redirect URL => '" + tcRedirectURL + "'");
 		}
 
-		response.sendRedirect(response.encodeRedirectUrl(tcRedirectURL));
+		response.sendRedirect(response.encodeRedirectUrl(tcRedirectURL), responseCode);
 	}
 
 
@@ -568,7 +589,7 @@ public class core extends ValveBase implements Serializable {
 
 		if (! tcHostPort.matches("^[1-9][0-9]*$")) {
 			if (loggingEnabled) {
-				System.out.println("[mod_cfml] incoming host [" + host + "] seemed to contain a port definition (eg. ':8080'), but port was not numeric => " + tcHostPort);
+				System.out.println("[mod_cfml] INFO: incoming host [" + host + "] seemed to contain a port definition (eg. ':8080'), but port was not numeric => " + tcHostPort);
 			}
 			return host;
 		}
@@ -576,7 +597,7 @@ public class core extends ValveBase implements Serializable {
 		String newHost = host.substring(0, colonPos);
 
 		if (loggingEnabled) {
-			System.out.println("[mod_cfml] host ["+host+"] contains ':'. New value => " + newHost);
+			System.out.println("[mod_cfml] INFO: host ["+host+"] contains ':'. New value => " + newHost);
 		}
 
 		return newHost;
