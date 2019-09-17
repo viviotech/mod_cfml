@@ -49,6 +49,7 @@
     maxContexts="200"
     timeBetweenContexts="2000"
     scanClassPaths="false"
+    responseCode="307"
     sharedKey="secret key also set in the Apache/IIS config" /&gt;</code></pre>
 									<dl>
 										<dt>classname="mod_cfml.core"</dt>
@@ -90,8 +91,18 @@
 												Values: <code>true</code> or <code>false</code><br>
 												Default: <code>false</code>
 											</p>
-											<p>TThis setting enables/disables the Tomcat Jar Scanner on each web context creation. This scan is the reason why web context creation in Tomcat seemed so slow, it takes multiple seconds to complete. For CFML engines, it is usually unnecessary to use it, and makes the web context loading 5 to 10 times faster.</p>
+											<p>This setting enables/disables the Tomcat Jar Scanner on each web context creation. This scan is the reason why web context creation in Tomcat seemed so slow, it takes multiple seconds to complete. For CFML engines, it is usually unnecessary to use it, and makes the web context loading 5 to 10 times faster.</p>
 											<p>If you are using Java/JSP pages in mod_cfml web contexts, or notice errors with jars which can not be found, then try setting this to True. If you are using Lucee or Railo, you might also be able to fix those errors by moving the missing jars to {web-context}/WEB-INF/lucee/lib/</p>
+										</dd>
+										<dt>responseCode="[301-308]"</dt>
+										<dd>
+											<p><em>Optional</em><br>
+												Values: <em>Integer</em><br>
+												Default: <code>302</code>
+											</p>
+											<p>This setting tells mod_cfml what redirect response code to send to the browser after the context has been created so that the browser will issue the request again. Added in version 1.1.11.</p>
+											<p>Supports redirect response code values between 301 and 308. Valve will default to 302 response code if no value is provided. 307 response code should be used if your application requires HTTP POST data (such as API requests or other form data) to be preserved.</p>
+											<p>Here is a <a href="https://ci.apache.org/projects/httpd/trunk/doxygen/group__HTTP__Status.html">list of officially supported apache response codes</a>.</p>
 										</dd>
 										<dt>sharedKey="secret key also set in the Apache/IIS config"</dt>
 										<dd>
