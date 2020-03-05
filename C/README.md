@@ -11,7 +11,7 @@ If you can't find a pre-compiled version at those locations, please follow the i
 
 ## Compile for Mac and Linux
 
-1. Get the source code from github: https://github.com/utdream/mod_cfml/archive/master.zip
+1. Get the source code from github: https://github.com/viviotech/mod_cfml/archive/master.zip
     and extract into eg. `~/Documents/` (_a sub-folder "mod_cfml-master" will be created_)
     
 2. This depends on the apache development tools, i.e. apsx
@@ -41,7 +41,7 @@ If you can't find a pre-compiled version at those locations, please follow the i
  - for Win64 into C:/Apache_x64 : https://www.apachelounge.com/download/
 3. Download and install cMake: http://www.cmake.org/download/
  - Make sure `C:\Program Files (x86)\cMake\bin\` is in your PATH after install
-4. Get the source code from github: https://github.com/utdream/mod_cfml/archive/master.zip
+4. Get the source code from github: https://github.com/viviotech/mod_cfml/archive/master.zip
     and extract into `C:\modcfml\` (_a sub-folder "mod_cfml-master" will be created_)
 
 ### Compile for Win Apache httpd 32-bit
