@@ -20,6 +20,7 @@
 # Rev. 1.1.08:	never released, but referenced in some git branch names, so skipping this version nr
 # Rev. 1.1.09:	(May 1, 2019) Only changed the Tomcat component
 # Rev. 1.1.10:	(June 5, 2019) Only changed the Tomcat component
+# Rev. 1.1.11:	(March 5, 2020) Only changed the Tomcat component
 #
 #				*** Don't forget to update the version nr. at modcfml_init_handler() when the Rev. nr. is updated! ***
 #
@@ -248,7 +249,7 @@ static int modcfml_init_handler(apr_pool_t *p, apr_pool_t *plog, apr_pool_t *pte
 	}
 
 	ap_log_error(APLOG_MARK, APLOG_STARTUP, 0, s,
-		"Thanks for using ModCFML, version 1.1.10");
+		"Thanks for using ModCFML, version 1.1.11");
     return OK;
 }
 
