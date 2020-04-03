@@ -92,9 +92,8 @@ ProxyPassMatch ^/(.+\.cf[cm])(/.*)?$ ajp://localhost:8009/$1$2</code></pre>
 									<h3>Installing mod_cfml.so</h3>
 
 									<p>Depending on the architecture of your Apache install, you either need to install the 64-bit or 32-bit module:</p>
-									<p><a href="https://github.com/utdream/mod_cfml/blob/master/C/builds/windows-httpd24-x64/mod_cfml.so?raw=true">Download Windows Apache2.4 <strong>64bit</strong> mod_cfml.so</a> &nbsp;&nbsp;&nbsp; <a href="https://github.com/utdream/mod_cfml/blob/master/C/builds/windows-httpd24-x86/mod_cfml.so?raw=true">Download Windows Apache2.4 <strong>32bit</strong> mod_cfml.so</a></p>
-									<p><a href="https://github.com/utdream/mod_cfml/blob/master/C/builds/windows-httpd22-x64/mod_cfml.so?raw=true">Download Windows Apache2.2 <strong>64bit</strong> mod_cfml.so</a> &nbsp;&nbsp;&nbsp; <a href="https://github.com/utdream/mod_cfml/blob/master/C/builds/windows-httpd22-x86/mod_cfml.so?raw=true">Download Windows Apache2.2 <strong>32bit</strong> mod_cfml.so</a></p>
-									<p>Move the downloaded file to C:/Apache24/modules/&nbsp; (or C:/Apache22/modules/)</p>
+									<p><a href="/download.html">mod_cfml Downloads</a></p>
+									<p>Move the downloaded <em>mod_cfml.so</em> file to C:/Apache24/modules/&nbsp; (or C:/Apache22/modules/)</p>
 									<p>Now, open up httpd.conf like we did before, and add the following to the end of the file:</p>
 
 									<pre><code>LoadModule modcfml_module modules/mod_cfml.so
