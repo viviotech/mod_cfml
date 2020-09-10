@@ -19,7 +19,7 @@ package mod_cfml;
  * 1.1.07 / 1.1.08: never released, but referenced in some git branch names, so skipping those
  * 1.1.09: May 1, 2019, Paul Klinkenberg (fixing broken 1.1.06 code; creating contexts thread-safe)
  * 1.1.10: June 5, 2019, Paul Klinkenberg (#24; improved redirect loop detection procedure: only add querystring param when necessary)
- * 1.1.11: August 26, 2019, Jordan Michaels - added redirect code option
+ * 1.1.11: August 26, 2019, Jordan Michaels - added response code option (issue 26)
  * 	!!!!**** Update Version number in
  *			'private String versionNumber'
  * 			as well *****!!!!!
@@ -67,7 +67,7 @@ public class core extends ValveBase implements Serializable {
 	private int maxContexts = 200;
 	private boolean scanClassPaths = false;
 	private String sharedKey = "";
-	private int responseCode = 302;
+	private int responseCode = 307;
 	private static String redirectKey = "__";
 
 	private static long lastContextTime = 0;
@@ -196,9 +196,9 @@ public class core extends ValveBase implements Serializable {
                 if ((responseCode < 301) || (responseCode > 308)) {
 			// bad response code, set to default 302
 			if (loggingEnabled) {
-				System.out.println("[mod_cfml] WARN: Invalid response code provided. Defaulting to 302.");
+				System.out.println("[mod_cfml] WARN: Invalid response code provided. Defaulting to 307.");
 			}
-			this.responseCode = 302;
+			this.responseCode = 307;
 			return;
 		}
 
