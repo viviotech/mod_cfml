@@ -3,8 +3,8 @@
 There are quite a few compiled versions of mod_cfml.so:
 
 - Windows: see the [builds directory](builds/)
-- Ubuntu: see the [mod_cfml installers](https://github.com/utdream/CFML-Installers/tree/master/lucee/linux/sys/mod_cfml)
-- CentOS: see the [mod_cfml installers](https://github.com/utdream/CFML-Installers/tree/master/lucee/linux/sys/mod_cfml)
+- Ubuntu: see the [mod_cfml installers](https://github.com/viviotech/CFML-Installers/tree/master/lucee/linux/sys/mod_cfml)
+- CentOS: see the [mod_cfml installers](https://github.com/viviotech/CFML-Installers/tree/master/lucee/linux/sys/mod_cfml)
 - Mac OSX 10.10 (maybe others as well): see the [builds directory](builds/)
 
 If you can't find a pre-compiled version at those locations, please follow the instructions underneath.
